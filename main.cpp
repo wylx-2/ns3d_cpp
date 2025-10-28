@@ -2,6 +2,7 @@
 #include <vector>
 #include <mpi.h>
 #include <field_structures.h>
+#include <ns3d_func.h>
 
 // --------------------------- Simple demo main (initialization only) -----------
 
@@ -15,11 +16,9 @@ int main(int argc, char** argv) {
 
     GridDesc G; G.global_nx = 64; G.global_ny = 64; G.global_nz = 64; G.dx = G.dy = G.dz = 1.0/64.0;
 
-    LocalDesc L; compute_local_desc(G, C, L, /*ghosts*/1,1,1);
-/*    printf("Rank %d has coordinates (%d,%d,%d)\n", C.rank, C.coords[0], C.coords[1], C.coords[2]);
-    printf("Rank %d neighbors: L=%d R=%d U=%d D=%d F=%d B=%d\n", C.rank, L.nbr_xm, 
-        L.nbr_xp, L.nbr_yp, L.nbr_ym, L.nbr_zp, L.nbr_zm);
-*/
+    int ghost_layers = 3;
+    LocalDesc L; compute_local_desc(G, C, L, /*ghosts*/ghost_layers,ghost_layers,ghost_layers);
+
     Field3D F; F.allocate(L);
 
     // init some field (e.g., constant density + small velocity perturbation in interior)
@@ -38,7 +37,14 @@ int main(int argc, char** argv) {
     HaloRequests reqs;
     exchange_halos_conserved(F, C, L, reqs);
 
+    SolverParams P;
+
     if (C.rank == 0) std::cout << "Initialization + halo exchange done\n";
+
+    for(int step=0;step<1000;++step){
+        double dt=compute_timestep(F,G,P); 
+        runge_kutta_3(F,C,G,P,reqs,dt);
+    }
 
     MPI_Finalize();
     return 0;

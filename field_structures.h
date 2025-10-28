@@ -469,6 +469,7 @@ inline void compute_local_desc(const GridDesc &G, CartDecomp &C, LocalDesc &L, i
     int gx = C.dims[0], gy = C.dims[1], gz = C.dims[2];
     int px = C.coords[0], py = C.coords[1], pz = C.coords[2];
 
+    // chunk 每个进程几个网格 and prefix 每个进程起始全局索引
     auto chunk = [](int N, int P, int coord){ int base = N / P; int rem = N % P; return base + (coord < rem ? 1 : 0); };
     auto prefix = [](int N, int P, int coord){ int base = N / P; int rem = N % P; return coord * base + std::min(coord, rem); };
 

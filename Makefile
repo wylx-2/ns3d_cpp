@@ -30,5 +30,5 @@ clean:
 	rm -f $(TARGET) $(OBJS) $(DEPS)
 
 run: $(TARGET)
-	@echo "Run with mpirun, e.g.: mpirun -n 2 ./$(TARGET)"
-	mpirun -n 2 ./$(TARGET)
+	@echo "Run with mpirun, e.g.: mpirun -n 4 ./$(TARGET)"
+	mpirun -n 4 ./$(TARGET)
