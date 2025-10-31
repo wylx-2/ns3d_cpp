@@ -1,195 +1,326 @@
 #include "ns3d_func.h"
 
-inline void flux_euler(double rho, double u, double v, double w,
-                double p, double E, double F[5])
+//==================================================================
+// flux calculation module
+//==================================================================
+
+// 计算无粘通量
+void compute_flux(Field3D &F, const SolverParams &P)
 {
-    F[0] = rho * u;
-    F[1] = rho * u * u + p;
-    F[2] = rho * u * v;
-    F[3] = rho * u * w;
-    F[4] = (E + p) * u;
+    const LocalDesc &L = F.L;
+    const double gamma = P.gamma;
+
+    for (int k = 0; k < L.sz; ++k) {
+        for (int j = 0; j < L.sy; ++j) {
+            for (int i = 0; i < L.sx; ++i) {
+
+                int id = F.I(i, j, k);
+                double rho = F.rho[id];
+                double u = F.u[id];
+                double v = F.v[id];
+                double w = F.w[id];
+                double E = F.E[id];
+                double p = F.p[id];
+
+                // X方向物理通量
+                F.Fflux_mass[id] = rho * u;
+                F.Fflux_momx[id] = rho * u * u + p;
+                F.Fflux_momy[id] = rho * u * v;
+                F.Fflux_momz[id] = rho * u * w;
+                F.Fflux_E[id]    = (E + p) * u;
+
+                // Y方向物理通量
+                F.Hflux_mass[id] = rho * v;
+                F.Hflux_momx[id] = rho * u * v;
+                F.Hflux_momy[id] = rho * v * v + p;
+                F.Hflux_momz[id] = rho * v * w;
+                F.Hflux_E[id]    = (E + p) * v;
+
+                // Z方向物理通量
+                F.Gflux_mass[id] = rho * w;
+                F.Gflux_momx[id] = rho * u * w;
+                F.Gflux_momy[id] = rho * v * w;
+                F.Gflux_momz[id] = rho * w * w + p;
+                F.Gflux_E[id]    = (E + p) * w;
+            }
+        }
+    }
 }
 
-inline double sound_speed(double gamma, double p, double rho)
+// 重构无粘通量
+void compute_flux_face(Field3D &F, const SolverParams &P)
 {
-    return std::sqrt(gamma * p / rho);
+    const LocalDesc &L = F.L;
+    const int nx = L.sx, ny = L.sy, nz = L.sz;
+    const int ngh = L.ngx;  // ghost层个数
+    const double eps = 1e-6;
+
+    // selection of reconstruction method
+    auto recon_method = P.recon;
+
+    // ----------------- X方向半节点通量 -----------------
+    for (int k = 0; k < nz; ++k)
+    for (int j = 0; j < ny; ++j)
+    for (int i = 2; i < nx - 2; ++i) {
+        int ids[5] = { F.I(i-2,j,k), F.I(i-1,j,k), F.I(i,j,k), F.I(i+1,j,k), F.I(i+2,j,k) };
+        int fid  = idx_fx(i, j, k, L);
+
+        // 使用数组指针避免 switch/case：构建源/目标数组指针表
+        std::array<std::vector<double>*,5> src_vec_x = {
+            &F.Fflux_mass, &F.Fflux_momx, &F.Fflux_momy, &F.Fflux_momz, &F.Fflux_E
+        };
+        std::array<std::vector<double>*,5> dst_vec_x = {
+            &F.flux_fx_mass, &F.flux_fx_momx, &F.flux_fx_momy, &F.flux_fx_momz, &F.flux_fx_E
+        };
+
+        std::array<double,5> st;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *src = src_vec_x[comp]->data();
+            double *dst = dst_vec_x[comp]->data();
+
+            for (int s = 0; s < 5; ++s) st[s] = src[ids[s]];
+
+            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
+                         ? linear_reconstruction(st)
+                         : weno5_reconstruction(st);
+
+            dst[fid] = val;
+        }
+    }
+
+    // ----------------- Y方向半节点通量 -----------------
+    for (int k = 0; k < nz; ++k)
+    for (int i = 0; i < nx; ++i)
+    for (int j = 2; j < ny - 2; ++j) {
+        int ids[5] = { F.I(i,j-2,k), F.I(i,j-1,k), F.I(i,j,k), F.I(i,j+1,k), F.I(i,j+2,k) };
+        int fid  = idx_fy(i, j, k, L);
+
+        std::array<std::vector<double>*,5> src_vec_y = {
+            &F.Hflux_mass, &F.Hflux_momx, &F.Hflux_momy, &F.Hflux_momz, &F.Hflux_E
+        };
+        std::array<std::vector<double>*,5> dst_vec_y = {
+            &F.flux_fy_mass, &F.flux_fy_momx, &F.flux_fy_momy, &F.flux_fy_momz, &F.flux_fy_E
+        };
+
+        std::array<double,5> sty;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *src = src_vec_y[comp]->data();
+            double *dst = dst_vec_y[comp]->data();
+
+            for (int s = 0; s < 5; ++s) sty[s] = src[ids[s]];
+
+            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
+                         ? linear_reconstruction(sty)
+                         : weno5_reconstruction(sty);
+
+            dst[fid] = val;
+        }
+    }
+
+    // ----------------- Z方向半节点通量 -----------------
+    for (int j = 0; j < ny; ++j)
+    for (int i = 0; i < nx; ++i)
+    for (int k = 2; k < nz - 2; ++k) {
+        int ids[5] = { F.I(i,j,k-2), F.I(i,j,k-1), F.I(i,j,k), F.I(i,j,k+1), F.I(i,j,k+2) };
+        int fid  = idx_fz(i, j, k, L);
+
+        std::array<std::vector<double>*,5> src_vec_z = {
+            &F.Gflux_mass, &F.Gflux_momx, &F.Gflux_momy, &F.Gflux_momz, &F.Gflux_E
+        };
+        std::array<std::vector<double>*,5> dst_vec_z = {
+            &F.flux_fz_mass, &F.flux_fz_momx, &F.flux_fz_momy, &F.flux_fz_momz, &F.flux_fz_E
+        };
+
+        std::array<double,5> stz;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *src = src_vec_z[comp]->data();
+            double *dst = dst_vec_z[comp]->data();
+
+            for (int s = 0; s < 5; ++s) stz[s] = src[ids[s]];
+
+            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
+                         ? linear_reconstruction(stz)
+                         : weno5_reconstruction(stz);
+
+            dst[fid] = val;
+        }
+    }
 }
 
-void rusanov_flux(const double *QL, const double *QR, double gamma, double *Fhat)
+// 计算空间导数
+void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
-    double rhoL = QL[0], uL = QL[1]/rhoL, vL = QL[2]/rhoL, wL = QL[3]/rhoL;
-    double pL = (gamma - 1.0) * (QL[4] - 0.5*rhoL*(uL*uL+vL*vL+wL*wL));
+    const LocalDesc &L = F.L;
+    const double dx = G.dx, dy = G.dy, dz = G.dz;
 
-    double rhoR = QR[0], uR = QR[1]/rhoR, vR = QR[2]/rhoR, wR = QR[3]/rhoR;
-    double pR = (gamma - 1.0) * (QR[4] - 0.5*rhoR*(uR*uR+vR*vR+wR*wR));
+    // Compute 6th-order central differences only for interior (non-ghost) points.
+    // Assumes ghost layers exist; we compute for i/j/k in [3, L.* - 4] so +/-3 stencil fits.
+    for (int k = 3; k <= L.sz - 4; ++k)
+    for (int j = 3; j <= L.sy - 4; ++j)
+    for (int i = 3; i <= L.sx - 4; ++i)
+    {
+        int id = F.I(i, j, k);
 
-    double FL[5], FR[5];
-    flux_euler(rhoL,uL,vL,wL,pL,QL[4],FL);
-    flux_euler(rhoR,uR,vR,wR,pR,QR[4],FR);
+        // neighbor indices (interior guaranteed so no bounds checks)
+        int ip  = F.I(i+1, j, k), im  = F.I(i-1, j, k);
+        int ip2 = F.I(i+2, j, k), im2 = F.I(i-2, j, k);
+        int ip3 = F.I(i+3, j, k), im3 = F.I(i-3, j, k);
 
-    double aL = sound_speed(gamma,pL,rhoL);
-    double aR = sound_speed(gamma,pR,rhoR);
-    double smax = std::max(std::abs(uL)+aL, std::abs(uR)+aR);
+        int jp  = F.I(i, j+1, k), jm  = F.I(i, j-1, k);
+        int jp2 = F.I(i, j+2, k), jm2 = F.I(i, j-2, k);
+        int jp3 = F.I(i, j+3, k), jm3 = F.I(i, j-3, k);
 
-    for(int k=0;k<5;++k)
-        Fhat[k] = 0.5*(FL[k]+FR[k]) - 0.5*smax*(QR[k]-QL[k]);
+        int kp  = F.I(i, j, k+1), km  = F.I(i, j, k-1);
+        int kp2 = F.I(i, j, k+2), km2 = F.I(i, j, k-2);
+        int kp3 = F.I(i, j, k+3), km3 = F.I(i, j, k-3);
+
+        // 6th-order central difference: (-f_{i+3} + 9 f_{i+2} -45 f_{i+1} +45 f_{i-1} -9 f_{i-2} + f_{i-3}) / (60 h)
+        F.du_dx[id] = (-F.u[ip3] + 9.0*F.u[ip2] - 45.0*F.u[ip] + 45.0*F.u[im] - 9.0*F.u[im2] + F.u[im3]) / (60.0 * dx);
+        F.du_dy[id] = (-F.u[jp3] + 9.0*F.u[jp2] - 45.0*F.u[jp] + 45.0*F.u[jm] - 9.0*F.u[jm2] + F.u[jm3]) / (60.0 * dy);
+        F.du_dz[id] = (-F.u[kp3] + 9.0*F.u[kp2] - 45.0*F.u[kp] + 45.0*F.u[km] - 9.0*F.u[km2] + F.u[km3]) / (60.0 * dz);
+
+        F.dv_dx[id] = (-F.v[ip3] + 9.0*F.v[ip2] - 45.0*F.v[ip] + 45.0*F.v[im] - 9.0*F.v[im2] + F.v[im3]) / (60.0 * dx);
+        F.dv_dy[id] = (-F.v[jp3] + 9.0*F.v[jp2] - 45.0*F.v[jp] + 45.0*F.v[jm] - 9.0*F.v[jm2] + F.v[jm3]) / (60.0 * dy);
+        F.dv_dz[id] = (-F.v[kp3] + 9.0*F.v[kp2] - 45.0*F.v[kp] + 45.0*F.v[km] - 9.0*F.v[km2] + F.v[km3]) / (60.0 * dz);
+
+        F.dw_dx[id] = (-F.w[ip3] + 9.0*F.w[ip2] - 45.0*F.w[ip] + 45.0*F.w[im] - 9.0*F.w[im2] + F.w[im3]) / (60.0 * dx);
+        F.dw_dy[id] = (-F.w[jp3] + 9.0*F.w[jp2] - 45.0*F.w[jp] + 45.0*F.w[jm] - 9.0*F.w[jm2] + F.w[jm3]) / (60.0 * dy);
+        F.dw_dz[id] = (-F.w[kp3] + 9.0*F.w[kp2] - 45.0*F.w[kp] + 45.0*F.w[km] - 9.0*F.w[km2] + F.w[km3]) / (60.0 * dz);
+
+        F.dT_dx[id] = (-F.T[ip3] + 9.0*F.T[ip2] - 45.0*F.T[ip] + 45.0*F.T[im] - 9.0*F.T[im2] + F.T[im3]) / (60.0 * dx);
+        F.dT_dy[id] = (-F.T[jp3] + 9.0*F.T[jp2] - 45.0*F.T[jp] + 45.0*F.T[jm] - 9.0*F.T[jm2] + F.T[jm3]) / (60.0 * dy);
+        F.dT_dz[id] = (-F.T[kp3] + 9.0*F.T[kp2] - 45.0*F.T[kp] + 45.0*F.T[km] - 9.0*F.T[km2] + F.T[km3]) / (60.0 * dz);
+    }
 }
 
-void computeEigenSystem3D(double nx, double ny, double nz,
-                          double gamma,
-                          double rhobar, double ubar, double vbar, double wbar,
-                          double Hbar, double c,
-                          double L[5][5], double R[5][5])
+// 计算粘性通量
+void compute_viscous_flux(Field3D &F, const SolverParams &P)
 {
-    // 方向上的投影速度
-    double V = nx*ubar + ny*vbar + nz*wbar;
-    double phi = 0.5 * (gamma - 1.0) * (ubar*ubar + vbar*vbar + wbar*wbar);
+    const LocalDesc &L = F.L;
+    const double mu = P.mu;
+    const double gamma = P.gamma;
+    const double Rgas = P.Rgas;
+    const double Pr = P.Pr;
+    const double Cp = gamma * Rgas / (gamma - 1.0);
 
-    // 系数定义（参考 Blazek 或 Toro 书）
-    double a1 = gamma - 1.0;
-    double a2 = 1.0 / (std::sqrt(2.0) * rhobar * c);
-    double a3 = rhobar / (std::sqrt(2.0) * c);
-    double a4 = (phi + c*c) / (gamma - 1.0);
-    double a5 = 1.0 - phi / (c*c);
-    double a6 = phi / (gamma - 1.0);
+    for (int k = 1; k < L.sz - 1; ++k)
+    for (int j = 1; j < L.sy - 1; ++j)
+    for (int i = 1; i < L.sx - 1; ++i)
+    {
+        int id = F.I(i, j, k);
 
-    //---------------------------
-    // 左特征向量矩阵 L
-    //---------------------------
-    L[0][0] =  a2 * (phi + c * V);
-    L[0][1] = -a2 * (a1 * ubar + nx * c);
-    L[0][2] = -a2 * (a1 * vbar + ny * c);
-    L[0][3] = -a2 * (a1 * wbar + nz * c);
-    L[0][4] =  a1 * a2;
+        // 速度散度
+        double divU = F.du_dx[id] + F.dv_dy[id] + F.dw_dz[id];
 
-    L[1][0] = nx * a5 - (nz * vbar - ny * wbar) / rhobar;
-    L[1][1] = nx * a1 * ubar / (c*c);
-    L[1][2] = nx * a1 * vbar / (c*c) + nz / rhobar;
-    L[1][3] = nx * a1 * wbar / (c*c) - ny / rhobar;
-    L[1][4] = -nx * a1 / (c*c);
+        // 应力分量
+        double tau_xx = 2.0 * mu * F.du_dx[id] - (2.0/3.0) * mu * divU;
+        double tau_yy = 2.0 * mu * F.dv_dy[id] - (2.0/3.0) * mu * divU;
+        double tau_zz = 2.0 * mu * F.dw_dz[id] - (2.0/3.0) * mu * divU;
 
-    L[2][0] = nz * a5 - (ny * ubar - nx * vbar) / rhobar;
-    L[2][1] = nz * a1 * ubar / (c*c) + ny / rhobar;
-    L[2][2] = nz * a1 * vbar / (c*c) - nx / rhobar;
-    L[2][3] = nz * a1 * wbar / (c*c);
-    L[2][4] = -nz * a1 / (c*c);
+        double tau_xy = mu * (F.du_dy[id] + F.dv_dx[id]);
+        double tau_xz = mu * (F.du_dz[id] + F.dw_dx[id]);
+        double tau_yz = mu * (F.dv_dz[id] + F.dw_dy[id]);
 
-    L[3][0] = ny * a5 - (nx * wbar - nz * ubar) / rhobar;
-    L[3][1] = ny * a1 * ubar / (c*c) - nz / rhobar;
-    L[3][2] = ny * a1 * vbar / (c*c);
-    L[3][3] = ny * a1 * wbar / (c*c) + nx / rhobar;
-    L[3][4] = -ny * a1 / (c*c);
+        // 热通量
+        double qx = -mu * Cp / Pr * F.dT_dx[id];
+        double qy = -mu * Cp / Pr * F.dT_dy[id];
+        double qz = -mu * Cp / Pr * F.dT_dz[id];
 
-    L[4][0] =  a2 * (phi - c * V);
-    L[4][1] = -a2 * (a1 * ubar - nx * c);
-    L[4][2] = -a2 * (a1 * vbar - ny * c);
-    L[4][3] = -a2 * (a1 * wbar - nz * c);
-    L[4][4] =  a1 * a2;
+        double u = F.u[id], v = F.v[id], w = F.w[id];
 
-    //---------------------------
-    // 右特征向量矩阵 R
-    //---------------------------
-    R[0][0] = a3;
-    R[1][0] = a3 * (ubar - nx * c);
-    R[2][0] = a3 * (vbar - ny * c);
-    R[3][0] = a3 * (wbar - nz * c);
-    R[4][0] = a3 * (a4 - c * V);
+        // X方向粘性通量
+        F.Fvflux_mass[id] = 0.0;
+        F.Fvflux_momx[id] = tau_xx;
+        F.Fvflux_momy[id] = tau_xy;
+        F.Fvflux_momz[id] = tau_xz;
+        F.Fvflux_E[id]    = u*tau_xx + v*tau_xy + w*tau_xz + qx;
 
-    R[0][1] = nx;
-    R[1][1] = nx * ubar;
-    R[2][1] = nx * vbar + nz * rhobar;
-    R[3][1] = nx * wbar - ny * rhobar;
-    R[4][1] = nx * a6 + rhobar * (nz * vbar - ny * wbar);
+        // Y方向粘性通量
+        F.Hvflux_mass[id] = 0.0;
+        F.Hvflux_momx[id] = tau_xy;
+        F.Hvflux_momy[id] = tau_yy;
+        F.Hvflux_momz[id] = tau_yz;
+        F.Hvflux_E[id]    = u*tau_xy + v*tau_yy + w*tau_yz + qy;
 
-    R[0][2] = nz;
-    R[1][2] = nz * ubar + ny * rhobar;
-    R[2][2] = nz * vbar - nx * rhobar;
-    R[3][2] = nz * wbar;
-    R[4][2] = nz * a6 + rhobar * (ny * ubar - nx * vbar);
-
-    R[0][3] = ny;
-    R[1][3] = ny * ubar - nz * rhobar;
-    R[2][3] = ny * vbar;
-    R[3][3] = ny * wbar + nx * rhobar;
-    R[4][3] = ny * a6 + rhobar * (nx * wbar - nz * ubar);
-
-    R[0][4] = a3;
-    R[1][4] = a3 * (ubar + nx * c);
-    R[2][4] = a3 * (vbar + ny * c);
-    R[3][4] = a3 * (wbar + nz * c);
-    R[4][4] = a3 * (a4 + c * V);
+        // Z方向粘性通量
+        F.Gvflux_mass[id] = 0.0;
+        F.Gvflux_momx[id] = tau_xz;
+        F.Gvflux_momy[id] = tau_yz;
+        F.Gvflux_momz[id] = tau_zz;
+        F.Gvflux_E[id]    = u*tau_xz + v*tau_yz + w*tau_zz + qz;
+    }
 }
 
-//------------------------------
-// Roe 平均通量（适用于任意方向）
-//------------------------------
-void roe_flux(const double *QL, const double *QR, 
-              double nx, double ny, double nz, double gamma,
-              double *Fhat)
+// 重构粘性通量
+void compute_vis_flux_face(Field3D &F, const SolverParams &P)
 {
-    // 解包左右状态
-    double rhoL = QL[0], uL = QL[1]/rhoL, vL = QL[2]/rhoL, wL = QL[3]/rhoL;
-    double pL = (gamma-1.0)*(QL[4]-0.5*rhoL*(uL*uL+vL*vL+wL*wL));
-    double HL = (QL[4] + pL) / rhoL;
+    const LocalDesc &L = F.L;
+    const int nx = L.sx, ny = L.sy, nz = L.sz;
 
-    double rhoR = QR[0], uR = QR[1]/rhoR, vR = QR[2]/rhoR, wR = QR[3]/rhoR;
-    double pR = (gamma-1.0)*(QR[4]-0.5*rhoR*(uR*uR+vR*vR+wR*wR));
-    double HR = (QR[4] + pR) / rhoR;
+    // Use c6th reconstruction from reconstruction.cpp when requested; that expects
+    // a 6-point scalar stencil (i-2 .. i+3) and returns a single reconstructed value.
+    // Fallback: if recon_vis != C6th, keep previous simple 7-point weights.
+    bool use_c6 = (P.recon_vis == SolverParams::Reconstruction::C6th);
 
-    // Roe 平均
-    double sqrL = std::sqrt(rhoL);
-    double sqrR = std::sqrt(rhoR);
-    double is = 1.0 / (sqrL + sqrR);
+    // ----------------- X方向粘性半节点通量 -----------------
+    for (int k = 0; k < nz; ++k)
+    for (int j = 0; j < ny; ++j)
+    for (int i = 2; i <= nx - 4; ++i) {
+        int fid = idx_fx(i, j, k, L);
 
-    double rhobar = sqrL * sqrR;
-    double ubar = (sqrL*uL + sqrR*uR) * is;
-    double vbar = (sqrL*vL + sqrR*vR) * is;
-    double wbar = (sqrL*wL + sqrR*wR) * is;
-    double Hbar = (sqrL*HL + sqrR*HR) * is;
+        std::array<std::vector<double>*,5> src = { &F.Fvflux_mass, &F.Fvflux_momx, &F.Fvflux_momy, &F.Fvflux_momz, &F.Fvflux_E };
+        std::array<std::vector<double>*,5> dst = { &F.flux_fx_mass, &F.flux_fx_momx, &F.flux_fx_momy, &F.flux_fx_momz, &F.flux_fx_E };
 
-    // 声速与投影速度
-    double Vbar = nx*ubar + ny*vbar + nz*wbar;
-    double a2 = (gamma-1.0)*(Hbar - 0.5*(ubar*ubar+vbar*vbar+wbar*wbar));
-    double abar = std::sqrt(std::max(a2, 1.0e-12));
 
-    // 构建左右特征矩阵
-    double L[5][5], R[5][5];
-    computeEigenSystem3D(nx,ny,nz,gamma,rhobar,ubar,vbar,wbar,Hbar,abar,L,R);
+        int ids6[6] = { F.I(i-2,j,k), F.I(i-1,j,k), F.I(i,j,k), F.I(i+1,j,k), F.I(i+2,j,k), F.I(i+3,j,k) };
+        std::array<double,6> s6;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *sp = src[comp]->data();
+            double *dp = dst[comp]->data();
+            for (int t = 0; t < 6; ++t) s6[t] = sp[ids6[t]];
+            double val = c6th_reconstruction(s6);
+            dp[fid] += val;  // note the += to add viscous to inviscid flux
+        }
+    }
 
-    // 计算左右通量
-    double FL[5], FR[5];
-    flux_euler(rhoL,uL,vL,wL,pL,QL[4],FL);
-    flux_euler(rhoR,uR,vR,wR,pR,QR[4],FR);
+    // ----------------- Y方向粘性半节点通量 -----------------
+    for (int k = 0; k < nz; ++k)
+    for (int i = 0; i < nx; ++i)
+    for (int j = 2; j <= ny - 4; ++j) {
+        int fid = idx_fy(i, j, k, L);
 
-    // 差值向量
-    double dU[5];
-    for(int m=0;m<5;++m) dU[m] = QR[m] - QL[m];
+        std::array<std::vector<double>*,5> src = { &F.Hvflux_mass, &F.Hvflux_momx, &F.Hvflux_momy, &F.Hvflux_momz, &F.Hvflux_E };
+        std::array<std::vector<double>*,5> dst = { &F.flux_fy_mass, &F.flux_fy_momx, &F.flux_fy_momy, &F.flux_fy_momz, &F.flux_fy_E };
 
-    // 波强度系数 α = L * ΔU
-    double alpha[5] = {0.0};
-    for(int i=0;i<5;++i)
-        for(int j=0;j<5;++j)
-            alpha[i] += L[i][j]*dU[j];
+        int ids6[6] = { F.I(i,j-2,k), F.I(i,j-1,k), F.I(i,j,k), F.I(i,j+1,k), F.I(i,j+2,k), F.I(i,j+3,k) };
+        std::array<double,6> s6;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *sp = src[comp]->data();
+            double *dp = dst[comp]->data();
+            for (int t = 0; t < 6; ++t) s6[t] = sp[ids6[t]];
+            double val = c6th_reconstruction(s6);
+            dp[fid] += val;
+        }
+    }
 
-    // 特征速度 λ
-    double lambda[5];
-    lambda[0] = Vbar - abar;
-    lambda[1] = Vbar;
-    lambda[2] = Vbar;
-    lambda[3] = Vbar;
-    lambda[4] = Vbar + abar;
+    // ----------------- Z方向粘性半节点通量 -----------------
+    for (int j = 0; j < ny; ++j)
+    for (int i = 0; i < nx; ++i)
+    for (int k = 2; k <= nz - 4; ++k) {
+        int fid = idx_fz(i, j, k, L);
 
-    // Roe 修正（防止奇异点）
-    for(int m=0;m<5;++m)
-        lambda[m] = std::fabs(lambda[m]);
+        std::array<std::vector<double>*,5> src = { &F.Gvflux_mass, &F.Gvflux_momx, &F.Gvflux_momy, &F.Gvflux_momz, &F.Gvflux_E };
+        std::array<std::vector<double>*,5> dst = { &F.flux_fz_mass, &F.flux_fz_momx, &F.flux_fz_momy, &F.flux_fz_momz, &F.flux_fz_E };
 
-    // 差分通量项 (|A|ΔU = R * |Λ| * α)
-    double Aabs_dU[5] = {0.0};
-    for(int i=0;i<5;++i)
-        for(int j=0;j<5;++j)
-            Aabs_dU[i] += R[i][j] * (lambda[j] * alpha[j]);
 
-    // Roe 通量
-    for(int m=0;m<5;++m)
-        Fhat[m] = 0.5*(FL[m] + FR[m]) - 0.5*Aabs_dU[m];
+        int ids6[6] = { F.I(i,j,k-2), F.I(i,j,k-1), F.I(i,j,k), F.I(i,j,k+1), F.I(i,j,k+2), F.I(i,j,k+3) };
+        std::array<double,6> s6;
+        for (int comp = 0; comp < 5; ++comp) {
+            double *sp = src[comp]->data();
+            double *dp = dst[comp]->data();
+            for (int t = 0; t < 6; ++t) s6[t] = sp[ids6[t]];
+            double val = c6th_reconstruction(s6);
+            dp[fid] += val;
+        }
+    }
 }

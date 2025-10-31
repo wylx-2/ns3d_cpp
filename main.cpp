@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
     exchange_halos_conserved(F, C, L, reqs);
 
     SolverParams P;
+    F.conservedToPrimitive(P); // update primitive variables (including ghosts)
 
     if (C.rank == 0) std::cout << "Initialization + halo exchange done\n";
 
