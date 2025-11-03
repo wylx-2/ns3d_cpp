@@ -7,7 +7,7 @@ CXX = mpicxx
 CXXFLAGS = -O3 -std=c++17 -Wall -Wextra -I. -MMD -MP
 LDFLAGS =
 
-SRCS = main.cpp
+SRCS = $(wildcard *.cpp)
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(OBJS:.o=.d)
 

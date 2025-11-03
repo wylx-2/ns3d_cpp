@@ -27,11 +27,13 @@ int main(int argc, char** argv) {
     for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
         int id = F.I(i,j,k);
         F.rho[id] = 1.0;
-        F.rhou[id] = 0.01;
-        F.rhov[id] = 0.0;
-        F.rhow[id] = 0.0;
+        F.rhou[id] = 1.0;
+        F.rhov[id] = 1.0;
+        F.rhow[id] = 1.0;
         F.E[id] = 1.0;
     }
+
+
 
     // exchange halos once
     HaloRequests reqs;
@@ -42,11 +44,20 @@ int main(int argc, char** argv) {
 
     if (C.rank == 0) std::cout << "Initialization + halo exchange done\n";
 
-    for(int step=0;step<1000;++step){
-        double dt=compute_timestep(F,G,P); 
-        runge_kutta_3(F,C,G,P,reqs,dt);
-    }
+    // output the initial field
+    std::string prefix = "initial_field";
+    write_tecplot_field(F, G, C, prefix, 0.0);
 
+    // Main time-stepping loop
+    int max_steps = 1000;
+    int monitor_freq = 100;
+    int output_freq = 200;
+    double TotalTime = 10.0;
+    time_advance(F, C, G, P, reqs, max_steps, monitor_freq, output_freq, TotalTime);
+
+    // output the final field
+    prefix = "final_field";
+    write_tecplot_field(F, G, C, prefix, TotalTime);
     MPI_Finalize();
     return 0;
 }

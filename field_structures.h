@@ -15,6 +15,9 @@
  *    should use the provided accessors and face buffers.
  */
 
+#ifndef NS3D_FIELD_STRUCTURES_H
+#define NS3D_FIELD_STRUCTURES_H
+
 #include <mpi.h>
 #include <vector>
 #include <array>
@@ -109,6 +112,16 @@ struct Field3D {
     // main conserved variables (SoA): shape = sx * sy * sz
     // Conserved variable ordering: rho, rho*u, rho*v, rho*w, E
     std::vector<double> rho, rhou, rhov, rhow, E;
+    std::vector<double> rho0, rhou0, rhov0, rhow0, E0;
+    std::vector<double> res_rho, res_rhou, res_rhov, res_rhow, res_E;
+
+    // golbal residual accumulators
+    double global_res_rho = 0.0;
+    double global_res_rhou = 0.0;
+    double global_res_rhov = 0.0;
+    double global_res_rhow = 0.0;
+    double global_res_E = 0.0;
+    double global_Etot = 0.0;
 
     // Primitive variables (optional cache) -- keep for convenience / performance
     std::vector<double> u, v, w, p, T;
@@ -153,6 +166,18 @@ struct Field3D {
         rhov.assign(tot, 0.0);
         rhow.assign(tot, 0.0);
         E.assign(tot, 0.0);
+
+        rho0.assign(tot, 0.0);
+        rhou0.assign(tot, 0.0);
+        rhov0.assign(tot, 0.0);
+        rhow0.assign(tot, 0.0);
+        E0.assign(tot, 0.0);
+
+        res_rho.assign(tot, 0.0);
+        res_rhou.assign(tot, 0.0);
+        res_rhov.assign(tot, 0.0);
+        res_rhow.assign(tot, 0.0);
+        res_E.assign(tot, 0.0);
 
         u.assign(tot, 0.0);
         v.assign(tot, 0.0);
@@ -327,6 +352,26 @@ struct Field3D {
                     p[id] = (gamma - 1.0) * rr * e_internal; // NOTE: here p = (gamma-1) * rho * e
                     T[id] = p[id] / (rr * par.Rgas);
                 }
+    }
+
+    // record current conserved variables into _0 arrays
+    void recordConservedTo0() {
+        std::copy(rho.begin(), rho.end(), rho0.begin());
+        std::copy(rhou.begin(), rhou.end(), rhou0.begin());
+        std::copy(rhov.begin(), rhov.end(), rhov0.begin());
+        std::copy(rhow.begin(), rhow.end(), rhow0.begin());
+        std::copy(E.begin(), E.end(), E0.begin());
+    }
+
+    // residual update: res_var = var - var0
+    void updateResiduals() {
+        for (size_t i = 0; i < rho.size(); ++i) {
+            res_rho[i]  = rho[i]  - rho0[i];
+            res_rhou[i] = rhou[i] - rhou0[i];
+            res_rhov[i] = rhov[i] - rhov0[i];
+            res_rhow[i] = rhow[i] - rhow0[i];
+            res_E[i]    = E[i]    - E0[i];
+        }
     }
 };
 
@@ -777,3 +822,5 @@ inline void compute_local_desc(const GridDesc &G, CartDecomp &C, LocalDesc &L, i
  *    computed half-node fluxes. The face arrays allocated above satisfy sizes for that use.
  *  - I/O (VTK, HDF5) and checkpointing not implemented here; add parallel HDF5 for large runs.
  */
+
+#endif // NS3D_FIELD_STRUCTURES_H
