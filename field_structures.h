@@ -85,6 +85,13 @@ struct SolverParams {
     double Rgas = 287.058;   // specific gas constant (J/kg/K), optional
     double cfl = 0.5;
     bool use_periodic = false; // convenience
+    // Flux Vector Splitting (FVS) selection
+    enum class FVS_Type {
+        StegerWarming,
+        LaxFriedrichs,
+        VanLeer
+    };
+    FVS_Type fvs_type = FVS_Type::StegerWarming;
     // Reconstruction selection for face reconstruction routines
     enum class Reconstruction {
         WENO5,     // stencil-based WENO5

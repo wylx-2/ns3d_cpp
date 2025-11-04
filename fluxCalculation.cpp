@@ -147,6 +147,122 @@ void compute_flux_face(Field3D &F, const SolverParams &P)
     }
 }
 
+// -----------------------------------------------------------------
+// ---------   Flux Vector Splitting (FVS) -------------------------
+// -----------------------------------------------------------------
+
+// 1. eigenvalue分解
+void eigen_decomposition(const double rho, const double u, const double v, const double w,
+                         const double p, const SolverParams &P,
+                         std::array<double,5> &lambda,
+                         std::array<std::array<double,5>,5> &R,
+                         std::array<std::array<double,5>,5> &R_inv)
+{
+    const double gamma = P.gamma;
+    const double a = sqrt(gamma * p / rho); // sound speed
+    const double H = (p / (gamma - 1.0) + 0.5 * rho * (u*u + v*v + w*w)) / rho; // total enthalpy
+
+    // Eigenvalues
+    lambda[0] = u - a;
+    lambda[1] = u;
+    lambda[2] = u;
+    lambda[3] = u;
+    lambda[4] = u + a;
+
+    // Right eigenvectors
+    R[0] = {1.0,         1.0,         0.0,         0.0,         1.0        };
+    R[1] = {u - a,      u,           0.0,         0.0,         u + a      };
+    R[2] = {v,          v,           1.0,         0.0,         v          };
+    R[3] = {w,          w,           0.0,         1.0,         w          };
+    R[4] = {H - u*a,    0.5*(u*u + v*v + w*w), v, w, H + u*a };
+
+    // Left eigenvectors (R_inv)
+    // (Implementation omitted for brevity; would compute the inverse of R)
+    double beta = 0.5 / (a * a);
+    R_inv[0] = { beta*(0.5*(gamma - 1.0)*(u*u + v*v + w*w) + a*u), -beta*( (gamma - 1.0)*u + a ), -beta*(gamma - 1.0)*v, -beta*(gamma - 1.0)*w, beta*(gamma - 1.0) };
+    R_inv[1] = { 1.0 - (gamma - 1.0)*(u*u + v*v + w*w)/(2.0*a*a), (gamma - 1.0)*u/(a*a), (gamma - 1.0)*v/(a*a), (gamma - 1.0)*w/(a*a), -(gamma - 1.0)/(a*a) };
+    R_inv[2] = { -v, 0.0, 1.0, 0.0, 0.0 };
+    R_inv[3] = { -w, 0.0, 0.0, 1.0, 0.0 };
+    R_inv[4] = { beta*(0.5*(gamma - 1.0)*(u*u + v*v + w*w) - a*u), -beta*( (gamma - 1.0)*u - a ), -beta*(gamma - 1.0)*v, -beta*(gamma - 1.0)*w, beta*(gamma - 1.0) };
+}
+
+// 2. 正负特征值分离
+// steger-warming分离/Lax-Friedrichs分离/Van Leer分离
+void flux_vector_splitting(const std::array<double,5> &lambda,
+                            std::array<double,5> &lambda_plus,
+                            std::array<double,5> &lambda_minus,
+                            const SolverParams &P)
+{
+    const double eps = 1e-6;
+    switch (P.fvs_type) {
+        case SolverParams::FVS_Type::StegerWarming:
+            for (int m = 0; m < 5; ++m) {
+                lambda_plus[m]  = 0.5 * (lambda[m] + fabs(lambda[m]));
+                lambda_minus[m] = 0.5 * (lambda[m] - fabs(lambda[m]));
+            }
+            break;
+
+        case SolverParams::FVS_Type::LaxFriedrichs:
+            for (int m = 0; m < 5; ++m) {
+                double alpha = fabs(lambda[m]) + eps;
+                lambda_plus[m]  = 0.5 * (lambda[m] + alpha);
+                lambda_minus[m] = 0.5 * (lambda[m] - alpha);
+            }
+            break;
+
+        case SolverParams::FVS_Type::VanLeer:
+            for (int m = 0; m < 5; ++m) {
+                if (lambda[m] > 0) {
+                    lambda_plus[m]  = lambda[m] * lambda[m] / (lambda[m] + eps);
+                    lambda_minus[m] = 0.0;
+                } else {
+                    lambda_plus[m]  = 0.0;
+                    lambda_minus[m] = lambda[m] * lambda[m] / ( -lambda[m] + eps);
+                }
+            }
+            break;
+    }
+}
+
+
+// 3. 通量重构
+void reconstruct_fvs_flux(Field3D &F, const SolverParams &P)
+{
+    // x方向FVS通量重构
+    const LocalDesc &L = F.L;
+    const int nx = L.sx, ny = L.sy, nz = L.sz;
+    for (int k = 0; k < nz; ++k)
+    for (int j = 0; j < ny; ++j)
+    for (int i = 2; i < nx - 2; ++i) {
+        int fid = idx_fx(i, j, k, L);
+
+        // 提取守恒变量
+        int idL = F.I(i-1, j, k);
+        int idR = F.I(i, j, k);
+        double rhoL = F.rho[idL], uL = F.u[idL], vL = F.v[idL], wL = F.w[idL], pL = F.p[idL];
+        double rhoR = F.rho[idR], uR = F.u[idR], vR = F.v[idR], wR = F.w[idR], pR = F.p[idR];
+
+        // 特征分解
+        std::array<double,5> lambdaL, lambdaR;
+        std::array<std::array<double,5>,5> RL, RL_inv;
+        std::array<std::array<double,5>,5> RR, RR_inv;
+
+        eigen_decomposition(rhoL, uL, vL, wL, pL, P, lambdaL, RL, RL_inv);
+        eigen_decomposition(rhoR, uR, vR, wR, pR, P, lambdaR, RR, RR_inv);
+
+        // 特征值分离
+        std::array<double,5> lambda_plusL, lambda_minusL;
+        std::array<double,5> lambda_plusR, lambda_minusR;
+
+        flux_vector_splitting(lambdaL, lambda_plusL, lambda_minusL, P);
+        flux_vector_splitting(lambdaR, lambda_plusR, lambda_minusR, P);
+
+        // 计算正负通量
+        // FVS通量计算公式：F_plus = R * Lambda_plus * R_inv * U，F_minus类似
+        // 最终结果存储在F.flux_fx_XXX[fid]中
+    }
+}
+
 // 计算空间导数
 void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
