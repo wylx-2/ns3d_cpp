@@ -1,5 +1,42 @@
 #include "ns3d_func.h"
 #include <array>
+#include <vector>
+
+// wrapper that selects recon method
+
+// Public wrapper that accepts a runtime-sized stencil (std::vector)
+// and forwards to the fixed-size implementations when possible.
+double reconstruct_select(const std::vector<double> &vstencil, double flag, const SolverParams::Reconstruction &r)
+{
+    int n = (int)vstencil.size();
+    if (n == 5) {
+        std::array<double,5> a5;
+        for (int i = 0; i < 5; ++i) a5[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a5.begin(), a5.end());
+        if (r == SolverParams::Reconstruction::WENO5) return weno5_reconstruction(a5);
+        else return linear_reconstruction(a5);
+    }
+    if (n == 6) {
+        std::array<double,6> a6;
+        for (int i = 0; i < 6; ++i) a6[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a6.begin(), a6.end());
+        return c6th_reconstruction(a6);
+    }
+    if (n == 4) {
+        std::array<double,4> a4;
+        for (int i = 0; i < 4; ++i) a4[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a4.begin(), a4.end());
+        return c4th_reconstruction(a4);
+    }
+
+    // fallback for arbitrary size: simple centered/biased average
+    if (n >= 2) {
+        int mid = n/2;
+        if (flag >= 0.0) return 0.5 * (vstencil[mid] + vstencil[mid-1]);
+        else return 0.5 * (vstencil[mid] + vstencil[mid+1]);
+    }
+    return vstencil.empty() ? 0.0 : vstencil[0];
+}
 
 // 简单的线性重构（标量，5点模板）
 double linear_reconstruction(const std::array<double,5>& stencil) {

@@ -151,117 +151,423 @@ void compute_flux_face(Field3D &F, const SolverParams &P)
 // ---------   Flux Vector Splitting (FVS) -------------------------
 // -----------------------------------------------------------------
 
-// 1. eigenvalue分解
-void eigen_decomposition(const double rho, const double u, const double v, const double w,
-                         const double p, const SolverParams &P,
-                         std::array<double,5> &lambda,
-                         std::array<std::array<double,5>,5> &R,
-                         std::array<std::array<double,5>,5> &R_inv)
+// FVS main 计算通量的重构值
+void computeFVSFluxes(Field3D &F, const SolverParams &P)
 {
-    const double gamma = P.gamma;
-    const double a = sqrt(gamma * p / rho); // sound speed
-    const double H = (p / (gamma - 1.0) + 0.5 * rho * (u*u + v*v + w*w)) / rho; // total enthalpy
+    compute_flux(F, P);
 
-    // Eigenvalues
-    lambda[0] = u - a;
-    lambda[1] = u;
-    lambda[2] = u;
-    lambda[3] = u;
-    lambda[4] = u + a;
-
-    // Right eigenvectors
-    R[0] = {1.0,         1.0,         0.0,         0.0,         1.0        };
-    R[1] = {u - a,      u,           0.0,         0.0,         u + a      };
-    R[2] = {v,          v,           1.0,         0.0,         v          };
-    R[3] = {w,          w,           0.0,         1.0,         w          };
-    R[4] = {H - u*a,    0.5*(u*u + v*v + w*w), v, w, H + u*a };
-
-    // Left eigenvectors (R_inv)
-    // (Implementation omitted for brevity; would compute the inverse of R)
-    double beta = 0.5 / (a * a);
-    R_inv[0] = { beta*(0.5*(gamma - 1.0)*(u*u + v*v + w*w) + a*u), -beta*( (gamma - 1.0)*u + a ), -beta*(gamma - 1.0)*v, -beta*(gamma - 1.0)*w, beta*(gamma - 1.0) };
-    R_inv[1] = { 1.0 - (gamma - 1.0)*(u*u + v*v + w*w)/(2.0*a*a), (gamma - 1.0)*u/(a*a), (gamma - 1.0)*v/(a*a), (gamma - 1.0)*w/(a*a), -(gamma - 1.0)/(a*a) };
-    R_inv[2] = { -v, 0.0, 1.0, 0.0, 0.0 };
-    R_inv[3] = { -w, 0.0, 0.0, 1.0, 0.0 };
-    R_inv[4] = { beta*(0.5*(gamma - 1.0)*(u*u + v*v + w*w) - a*u), -beta*( (gamma - 1.0)*u - a ), -beta*(gamma - 1.0)*v, -beta*(gamma - 1.0)*w, beta*(gamma - 1.0) };
-}
-
-// 2. 正负特征值分离
-// steger-warming分离/Lax-Friedrichs分离/Van Leer分离
-void flux_vector_splitting(const std::array<double,5> &lambda,
-                            std::array<double,5> &lambda_plus,
-                            std::array<double,5> &lambda_minus,
-                            const SolverParams &P)
-{
-    const double eps = 1e-6;
-    switch (P.fvs_type) {
-        case SolverParams::FVS_Type::StegerWarming:
-            for (int m = 0; m < 5; ++m) {
-                lambda_plus[m]  = 0.5 * (lambda[m] + fabs(lambda[m]));
-                lambda_minus[m] = 0.5 * (lambda[m] - fabs(lambda[m]));
-            }
-            break;
-
-        case SolverParams::FVS_Type::LaxFriedrichs:
-            for (int m = 0; m < 5; ++m) {
-                double alpha = fabs(lambda[m]) + eps;
-                lambda_plus[m]  = 0.5 * (lambda[m] + alpha);
-                lambda_minus[m] = 0.5 * (lambda[m] - alpha);
-            }
-            break;
-
-        case SolverParams::FVS_Type::VanLeer:
-            for (int m = 0; m < 5; ++m) {
-                if (lambda[m] > 0) {
-                    lambda_plus[m]  = lambda[m] * lambda[m] / (lambda[m] + eps);
-                    lambda_minus[m] = 0.0;
-                } else {
-                    lambda_plus[m]  = 0.0;
-                    lambda_minus[m] = lambda[m] * lambda[m] / ( -lambda[m] + eps);
-                }
-            }
-            break;
-    }
-}
-
-
-// 3. 通量重构
-void reconstruct_fvs_flux(Field3D &F, const SolverParams &P)
-{
-    // x方向FVS通量重构
     const LocalDesc &L = F.L;
-    const int nx = L.sx, ny = L.sy, nz = L.sz;
-    for (int k = 0; k < nz; ++k)
-    for (int j = 0; j < ny; ++j)
-    for (int i = 2; i < nx - 2; ++i) {
-        int fid = idx_fx(i, j, k, L);
+    int nx = L.sx, ny = L.sy, nz = L.sz;
+    const int VAR = 5; // 变量个数：rho, rhou, rhov, rhow, E
+    // Use runtime stencil size from SolverParams so different reconstructions
+    // (WENO5, C6th, ...) can be selected at runtime.
+    int stencil = P.stencil;
 
-        // 提取守恒变量
-        int idL = F.I(i-1, j, k);
-        int idR = F.I(i, j, k);
-        double rhoL = F.rho[idL], uL = F.u[idL], vL = F.v[idL], wL = F.w[idL], pL = F.p[idL];
-        double rhoR = F.rho[idR], uR = F.u[idR], vR = F.v[idR], wR = F.w[idR], pR = F.p[idR];
+    // X方向通量重构
+    for (int k = 0; k < nz; ++k) {
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 2; i < nx - 2; ++i) {
+                // dynamic 2D arrays: VAR x stencil
+                std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
 
-        // 特征分解
-        std::array<double,5> lambdaL, lambdaR;
-        std::array<std::array<double,5>,5> RL, RL_inv;
-        std::array<std::array<double,5>,5> RR, RR_inv;
+                for (int m = 0; m < stencil; ++m) {
+                    int ii = i + (m - (stencil/2));
+                    int id = F.I(ii, j, k);
 
-        eigen_decomposition(rhoL, uL, vL, wL, pL, P, lambdaL, RL, RL_inv);
-        eigen_decomposition(rhoR, uR, vR, wR, pR, P, lambdaR, RR, RR_inv);
+                    Ft[0][m] = F.Fflux_mass[id];
+                    Ft[1][m] = F.Fflux_momx[id];
+                    Ft[2][m] = F.Fflux_momy[id];
+                    Ft[3][m] = F.Fflux_momz[id];
+                    Ft[4][m] = F.Fflux_E[id];
+                    Ut[0][m] = F.rho[id];
+                    Ut[1][m] = F.rhou[id];
+                    Ut[2][m] = F.rhov[id];
+                    Ut[3][m] = F.rhow[id];
+                    Ut[4][m] = F.E[id];
+                    ut[0][m] = F.rho[id];
+                    ut[1][m] = F.u[id];
+                    ut[2][m] = F.v[id];
+                    ut[3][m] = F.w[id];
+                    ut[4][m] = F.p[id];
+                }
 
-        // 特征值分离
-        std::array<double,5> lambda_plusL, lambda_minusL;
-        std::array<double,5> lambda_plusR, lambda_minusR;
+                std::vector<double> Fface(VAR, 0.0);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/0);
 
-        flux_vector_splitting(lambdaL, lambda_plusL, lambda_minusL, P);
-        flux_vector_splitting(lambdaR, lambda_plusR, lambda_minusR, P);
+                int face_i = i-1;
+                int fid = idx_fx(face_i, j, k, L);
+                F.flux_fx_mass[fid] = Fface[0];
+                F.flux_fx_momx[fid] = Fface[1];
+                F.flux_fx_momy[fid] = Fface[2];
+                F.flux_fx_momz[fid] = Fface[3];
+                F.flux_fx_E[fid]    = Fface[4];
+            }
+        }
+    }
 
-        // 计算正负通量
-        // FVS通量计算公式：F_plus = R * Lambda_plus * R_inv * U，F_minus类似
-        // 最终结果存储在F.flux_fx_XXX[fid]中
+    // Y方向通量重构
+    for (int k = 0; k < nz; ++k) {
+        for (int i = 0; i < nx; ++i) {
+            for (int j = 2; j < ny - 2; ++j) {
+                // dynamic 2D arrays: VAR x stencil
+                std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
+
+                for (int m = 0; m < stencil; ++m) {
+                    int jj = j + (m - (stencil/2));
+                    int id = F.I(i, jj, k);
+
+                    Ft[0][m] = F.Hflux_mass[id];
+                    Ft[1][m] = F.Hflux_momx[id];
+                    Ft[2][m] = F.Hflux_momy[id];
+                    Ft[3][m] = F.Hflux_momz[id];
+                    Ft[4][m] = F.Hflux_E[id];
+                    Ut[0][m] = F.rho[id];
+                    Ut[1][m] = F.rhou[id];
+                    Ut[2][m] = F.rhov[id];
+                    Ut[3][m] = F.rhow[id];
+                    Ut[4][m] = F.E[id];
+                    ut[0][m] = F.rho[id];
+                    ut[1][m] = F.u[id];
+                    ut[2][m] = F.v[id];
+                    ut[3][m] = F.w[id];
+                    ut[4][m] = F.p[id];
+                }
+
+                std::vector<double> Fface(VAR, 0.0);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/1);
+
+                int face_j = j-1;
+                int fid = idx_fy(i, face_j, k, L);
+                F.flux_fy_mass[fid] = Fface[0];
+                F.flux_fy_momx[fid] = Fface[1];
+                F.flux_fy_momy[fid] = Fface[2];
+                F.flux_fy_momz[fid] = Fface[3];
+                F.flux_fy_E[fid]    = Fface[4];
+            }
+        }
+    }
+
+    // Z方向通量重构
+    for (int j = 0; j < ny; ++j) {
+        for (int i = 0; i < nx; ++i) {
+            for (int k = 2; k < nz - 2; ++k) {
+                // dynamic 2D arrays: VAR x stencil
+                std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
+                std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
+
+                for (int m = 0; m < stencil; ++m) {
+                    int kk = k + (m - (stencil/2));
+                    int id = F.I(i, j, kk);
+
+                    Ft[0][m] = F.Gflux_mass[id];
+                    Ft[1][m] = F.Gflux_momx[id];
+                    Ft[2][m] = F.Gflux_momy[id];
+                    Ft[3][m] = F.Gflux_momz[id];
+                    Ft[4][m] = F.Gflux_E[id];
+                    Ut[0][m] = F.rho[id];
+                    Ut[1][m] = F.rhou[id];
+                    Ut[2][m] = F.rhov[id];
+                    Ut[3][m] = F.rhow[id];
+                    Ut[4][m] = F.E[id];
+                    ut[0][m] = F.rho[id];
+                    ut[1][m] = F.u[id];
+                    ut[2][m] = F.v[id];
+                    ut[3][m] = F.w[id];
+                    ut[4][m] = F.p[id];
+                }
+
+                std::vector<double> Fface(VAR, 0.0);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/2);
+
+                int face_k = k-1;
+                int fid = idx_fz(i, j, face_k, L);
+                F.flux_fz_mass[fid] = Fface[0];
+                F.flux_fz_momx[fid] = Fface[1];
+                F.flux_fz_momy[fid] = Fface[2];
+                F.flux_fz_momz[fid] = Fface[3];
+                F.flux_fz_E[fid]    = Fface[4];
+            }
+        }
+    }
+
+}
+
+// Roe平均
+void computeRoeAveragedState(double &rho_bar, double &rhou_bar, double &rhov_bar, double &rhow_bar,
+                             double &h_bar, double &a_bar,
+                             const double Ul[5], const double Ur[5],
+                             double gamma)
+{
+    // 提取左状态变量
+    double rho_L = Ul[0];
+    double u_L = Ul[1] / rho_L;
+    double v_L = Ul[2] / rho_L;
+    double w_L = Ul[3] / rho_L;
+    double p_L = (gamma - 1.0) * (Ul[4] - 0.5 * rho_L * (u_L*u_L + v_L*v_L + w_L*w_L));
+    // 提取右状态变量
+    double rho_R = Ur[0];
+    double u_R = Ur[1] / rho_R;
+    double v_R = Ur[2] / rho_R;
+    double w_R = Ur[3] / rho_R;
+    double p_R = (gamma - 1.0) * (Ur[4] - 0.5 * rho_R * (u_R*u_R + v_R*v_R + w_R*w_R));
+
+    // 计算Roe平均态
+    double sqrt_rho_L = std::sqrt(rho_L);
+    double sqrt_rho_R = std::sqrt(rho_R);
+    rho_bar = sqrt_rho_L * sqrt_rho_R;
+    double denom = 1.0 / (sqrt_rho_L + sqrt_rho_R);
+    rhou_bar = (sqrt_rho_L * u_L + sqrt_rho_R * u_R) * denom;
+    rhov_bar = (sqrt_rho_L * v_L + sqrt_rho_R * v_R) * denom;
+    rhow_bar = (sqrt_rho_L * w_L + sqrt_rho_R * w_R) * denom;
+    double H_L = (p_L / (gamma - 1.0) + 0.5 * rho_L * (u_L*u_L + v_L*v_L + w_L*w_L)) / rho_L;
+    double H_R = (p_R / (gamma - 1.0) + 0.5 * rho_R * (u_R*u_R + v_R*v_R + w_R*w_R)) / rho_R;
+    h_bar = (sqrt_rho_L * H_L + sqrt_rho_R * H_R) * denom;
+    double kinetic_bar = 0.5 * (rhou_bar*rhou_bar + rhov_bar*rhov_bar + rhow_bar*rhow_bar);
+    a_bar = std::sqrt((gamma - 1.0) * (h_bar - kinetic_bar));
+
+}
+
+// 计算左/右 特征向量矩阵 L (左) 与 R (右) 对任意法向量 (nx,ny,nz)
+// using Blazek-style formula from your snippet
+static void build_eigen_matrices(const double Ul[5], const double Ur[5],
+                                 double nx, double ny, double nz,
+                                 double gamma,
+                                 double Lmat[5][5], double Rmat[5][5],
+                                 double lambar[5])
+{
+    // first compute Roe averaged quantities
+    double rhobar, ubar, vbar, wbar, Hbar, abar, pbar;
+    computeRoeAveragedState(rhobar, ubar, vbar, wbar, Hbar, abar, Ul, Ur, gamma);
+
+    double V = nx * ubar + ny * vbar + nz * wbar;
+    double c = abar;
+
+    lambar[0] = V - c;
+    lambar[1] = V;
+    lambar[2] = V;
+    lambar[3] = V;
+    lambar[4] = V + c;
+
+    double phi = 0.5 * (gamma - 1.0) * (ubar*ubar + vbar*vbar + wbar*wbar);
+
+    double a1 = gamma - 1.0;
+    double a2 = 1.0 / (std::sqrt(2.0) * rhobar * c);
+    double a3 = rhobar / (std::sqrt(2.0) * c);
+    double a4 = (phi + c*c) / (gamma - 1.0);
+    double a5 = 1.0 - phi / (c*c);
+    double a6 = phi / (gamma - 1.0);
+
+    // Left eigenvectors L (rows)
+    // L[0][:]
+    Lmat[0][0] = a2 * (phi + c * V);
+    Lmat[0][1] = -a2 * (a1 * ubar + nx * c);
+    Lmat[0][2] = -a2 * (a1 * vbar + ny * c);
+    Lmat[0][3] = -a2 * (a1 * wbar + nz * c);
+    Lmat[0][4] = a1 * a2;
+
+    // L[1][:]
+    Lmat[1][0] = nx * a5 - (nz * vbar - ny * wbar) / rhobar;
+    Lmat[1][1] = nx * a1 * ubar / (c*c);
+    Lmat[1][2] = nx * a1 * vbar / (c*c) + nz / rhobar;
+    Lmat[1][3] = nx * a1 * wbar / (c*c) - ny / rhobar;
+    Lmat[1][4] = -nx * a1 / (c*c);
+
+    // L[2][:]
+    Lmat[2][0] = nz * a5 - (ny * ubar - nx * vbar) / rhobar;
+    Lmat[2][1] = nz * a1 * ubar / (c*c) + ny / rhobar;
+    Lmat[2][2] = nz * a1 * vbar / (c*c) - nx / rhobar;
+    Lmat[2][3] = nz * a1 * wbar / (c*c);
+    Lmat[2][4] = -nz * a1 / (c*c);
+
+    // L[3][:]
+    Lmat[3][0] = ny * a5 - (nx * wbar - nz * ubar) / rhobar;
+    Lmat[3][1] = ny * a1 * ubar / (c*c) - nz / rhobar;
+    Lmat[3][2] = ny * a1 * vbar / (c*c);
+    Lmat[3][3] = ny * a1 * wbar / (c*c) + nx / rhobar;
+    Lmat[3][4] = -ny * a1 / (c*c);
+
+    // L[4][:]
+    Lmat[4][0] = a2 * (phi - c * V);
+    Lmat[4][1] = -a2 * (a1 * ubar - nx * c);
+    Lmat[4][2] = -a2 * (a1 * vbar - ny * c);
+    Lmat[4][3] = -a2 * (a1 * wbar - nz * c);
+    Lmat[4][4] = a1 * a2;
+
+    // Right eigenvectors R (columns)
+    // R[:,0]
+    Rmat[0][0] = a3;
+    Rmat[1][0] = a3 * (ubar - nx*c);
+    Rmat[2][0] = a3 * (vbar - ny*c);
+    Rmat[3][0] = a3 * (wbar - nz*c);
+    Rmat[4][0] = a3 * (a4 - c * V);
+
+    // R[:,1]
+    Rmat[0][1] = nx;
+    Rmat[1][1] = nx * ubar;
+    Rmat[2][1] = nx * vbar + nz * rhobar;
+    Rmat[3][1] = nx * wbar - ny * rhobar;
+    Rmat[4][1] = nx * a6 + rhobar * (nz * vbar - ny * wbar);
+
+    // R[:,2]
+    Rmat[0][2] = nz;
+    Rmat[1][2] = nz * ubar + ny * rhobar;
+    Rmat[2][2] = nz * vbar - nx * rhobar;
+    Rmat[3][2] = nz * wbar;
+    Rmat[4][2] = nz * a6 + rhobar * (ny * ubar - nx * vbar);
+
+    // R[:,3]
+    Rmat[0][3] = ny;
+    Rmat[1][3] = ny * ubar - nz * rhobar;
+    Rmat[2][3] = ny * vbar;
+    Rmat[3][3] = ny * wbar + nx * rhobar;
+    Rmat[4][3] = ny * a6 + rhobar * (nx * wbar - nz * ubar);
+
+    // R[:,4]
+    Rmat[0][4] = a3;
+    Rmat[1][4] = a3 * (ubar + nx*c);
+    Rmat[2][4] = a3 * (vbar + ny*c);
+    Rmat[3][4] = a3 * (wbar + nz*c);
+    Rmat[4][4] = a3 * (a4 + c * V);
+}
+
+// 无粘通量重构
+// reconstructInviscidFlux: accept dynamic containers (VAR x stencil)
+void reconstructInviscidFlux(std::vector<double> &Fface,
+                             const std::vector<std::vector<double>> &Ft,
+                             const std::vector<std::vector<double>> &Ut,
+                             const std::vector<std::vector<double>> &ut,
+                             const SolverParams &P, double sigma, int dim)
+{
+    // alias
+    double gamma = P.gamma;
+    const int VAR = 5; // 变量个数：rho, rhou, rhov, rhow, E
+    // Use runtime stencil size from SolverParams so different reconstructions
+    // (WENO5, C6th, ...) can be selected at runtime.
+    int stencil = P.stencil;
+
+    // determine normal vector (nx,ny,nz)
+    double nx = 0.0, ny = 0.0, nz = 0.0;
+    if (dim == 0) { nx = 1.0; ny = 0.0; nz = 0.0; }
+    if (dim == 1) { nx = 0.0; ny = 1.0; nz = 0.0; }
+    if (dim == 2) { nx = 0.0; ny = 0.0; nz = 1.0; }
+
+    // 1) compute local stencil eigenvalues lamda[n][m] using primitives ut
+    std::vector<std::vector<double>> lamda(VAR, std::vector<double>(stencil));
+    for (int m = 0; m < stencil; ++m) {
+        double rho = ut[0][m];
+        double uu  = ut[1][m];
+        double vv  = ut[2][m];
+        double ww  = ut[3][m];
+        double pp  = ut[4][m];
+        double c = std::sqrt(gamma * pp / std::max(rho, 1e-12));
+        double V = nx * uu + ny * vv + nz * ww;
+        lamda[0][m] = V - c;
+        lamda[1][m] = V;
+        lamda[2][m] = V;
+        lamda[3][m] = V;
+        lamda[4][m] = V + c;
+    }
+
+    // 2) choose interface (left / right) states as stencil center positions:
+    //    In your reference: left at index 2 (i), right at 3 (i+1)
+    double Ul[VAR], Ur[VAR];
+    for (int n = 0; n < VAR; ++n) { Ul[n] = Ut[n][2]; Ur[n] = Ut[n][3]; }
+
+    // 3) compute Roe averaged eigenvectors and lambar
+    double Lmat[VAR][VAR], Rmat[VAR][VAR], lambar[VAR];
+    build_eigen_matrices(Ul, Ur, nx, ny, nz, gamma, Lmat, Rmat, lambar);
+
+    // 4) choose dissipation (lamdamax) per characteristic based on P.fvs_type:
+    double lamdamax[VAR];
+    switch (P.fvs_type) {
+        case SolverParams::FVS_Type::VanLeer: {
+            // Global Lax-Friedrichs: choose a global max over stencil and components
+            double gmax = 0.0;
+            for (int m = 0; m < stencil; ++m)
+                for (int n = 0; n < VAR; ++n)
+                    gmax = std::max(gmax, abs(lamda[n][m]));
+            for (int n = 0; n < VAR; ++n) lamdamax[n] = gmax;
+        } break;
+        case SolverParams::FVS_Type::LaxFriedrichs: {
+            // Local Lax-Friedrichs: per-component max over stencil
+            for (int n = 0; n < VAR; ++n) {
+                double mxx = 0.0;
+                for (int m = 0; m < stencil; ++m) mxx = std::max(mxx, abs(lamda[n][m]));
+                lamdamax[n] = mxx;
+            }
+        } break;
+        case SolverParams::FVS_Type::StegerWarming:
+        default: {
+            // Roe with entropy correction (approx)
+            for (int n = 0; n < VAR; ++n) {
+                double eps = 4.0 * std::max(std::max(lambar[n] - lamda[n][2], lamda[n][3] - lambar[n]), 0.0);
+                if (abs(lambar[n]) < eps) lamdamax[n] = (lambar[n]*lambar[n] + eps*eps) / (2.0 * eps);
+                else lamdamax[n] = abs(lambar[n]);
+            }
+        } break;
+    }
+
+    // 5) component-wise cheap option (sigma ~ 1.0 in your reference)
+    if (abs(sigma - 1.0) < 1e-12) {
+        // For each component n, form wtplus = 0.5*(Ft + lamdamax * Ut) across stencil
+        std::vector<double> wface(VAR, 0.0);
+        for (int n = 0; n < VAR; ++n) {
+            std::vector<double> wplus(stencil), wminus(stencil);
+            for (int m = 0; m < stencil; ++m) {
+                wplus[m]  = 0.5 * (Ft[n][m] + lamdamax[n] * Ut[n][m]);
+                wminus[m] = 0.5 * (Ft[n][m] - lamdamax[n] * Ut[n][m]);
+            }
+            double plus_face = reconstruct_select(wplus, +1.0, P.recon);
+            double minus_face = reconstruct_select(wminus, -1.0, P.recon);
+            wface[n] = plus_face + minus_face;
+        }
+        // component-wise result is wface in conservative flux-like variables
+        for (int n = 0; n < VAR; ++n) Fface[n] = wface[n];
+        return;
+    }
+
+    // 6) characteristic-wise reconstruction:
+    // Compute characteristic variables w = L * Ft  and LU = L * Ut (L is left-eig matrix)
+    std::vector<std::vector<double>> wchar(VAR, std::vector<double>(stencil));
+    std::vector<std::vector<double>> LU(VAR, std::vector<double>(stencil));
+    for (int m = 0; m < stencil; ++m) {
+        for (int n = 0; n < VAR; ++n) {
+            double sumw = 0.0, sumLU = 0.0;
+            for (int r = 0; r < VAR; ++r) {
+                sumw  += Lmat[n][r] * Ft[r][m];
+                sumLU += Lmat[n][r] * Ut[r][m];
+            }
+            wchar[n][m] = sumw;
+            LU[n][m] = sumLU;
+        }
+    }
+
+    // For each characteristic n, form wtplus = 0.5*(w + lamdamax * LU) and wtminus = ...
+    std::vector<double> wflux_char(VAR, 0.0);
+    for (int n = 0; n < VAR; ++n) {
+        std::vector<double> wtplus(stencil), wtminus(stencil);
+        for (int m = 0; m < stencil; ++m) {
+            wtplus[m] = 0.5 * (wchar[n][m] + lamdamax[n] * LU[n][m]);
+            wtminus[m] = 0.5 * (wchar[n][m] - lamdamax[n] * LU[n][m]);
+        }
+        double plus_face = reconstruct_select(wtplus, +1.0, P.recon);
+        double minus_face = reconstruct_select(wtminus, -1.0, P.recon);
+        wflux_char[n] = plus_face + minus_face;
+    }
+
+    // transform back to conservative flux via Fflux = R * wflux_char
+    for (int n = 0; n < VAR; ++n) {
+        double sum = 0.0;
+        for (int r = 0; r < VAR; ++r) sum += Rmat[n][r] * wflux_char[r];
+        Fface[n] = sum;
     }
 }
+
 
 // 计算空间导数
 void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)

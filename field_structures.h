@@ -102,6 +102,8 @@ struct SolverParams {
     };
     Reconstruction recon = Reconstruction::WENO5;
     Reconstruction recon_vis = Reconstruction::C6th;
+    // runtime stencil size for reconstructions (e.g., 5 for WENO5)
+    int stencil = 5;
 };
 
 // --------------------------- Halo exchange requests --------------------------

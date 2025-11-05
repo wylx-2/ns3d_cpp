@@ -29,6 +29,9 @@ double c6th_reconstruction(const std::array<double,6> &stencil);
 // C4th 四阶中心差分(标量，4 点模板)
 double c4th_reconstruction(const std::array<double,4>& stencil);
 
+// Runtime-sized reconstruction selector (accepts std::vector stencil)
+double reconstruct_select(const std::vector<double> &stencil, double flag, const SolverParams::Reconstruction &r);
+
 // RHS 计算占位符函数（用户需在此定义具体的通量差分或高阶算子）
 void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs);
 
