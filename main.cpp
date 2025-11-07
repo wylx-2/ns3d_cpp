@@ -21,25 +21,15 @@ int main(int argc, char** argv) {
 
     Field3D F; F.allocate(L);
 
-    // init some field (e.g., constant density + small velocity perturbation in interior)
-    for (int k=L.ngz; k<L.ngz+L.nz; ++k)
-    for (int j=L.ngy; j<L.ngy+L.ny; ++j)
-    for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
-        int id = F.I(i,j,k);
-        F.rho[id] = 1.0;
-        F.rhou[id] = 1.0;
-        F.rhov[id] = 1.0;
-        F.rhow[id] = 1.0;
-        F.E[id] = 1.0;
-    }
+    SolverParams P;
 
-
+    // Initialize field
+    initialize_uniform_field(F, G, P);
 
     // exchange halos once
     HaloRequests reqs;
     exchange_halos_conserved(F, C, L, reqs);
 
-    SolverParams P;
     F.conservedToPrimitive(P); // update primitive variables (including ghosts)
 
     if (C.rank == 0) std::cout << "Initialization + halo exchange done\n";

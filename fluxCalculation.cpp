@@ -4,6 +4,10 @@
 // flux calculation module
 //==================================================================
 
+// -----------------------------------------------------------------
+// ---------   Flux Vector Splitting (FVS) -------------------------
+// -----------------------------------------------------------------
+
 // 计算无粘通量
 void compute_flux(Field3D &F, const SolverParams &P)
 {
@@ -46,110 +50,6 @@ void compute_flux(Field3D &F, const SolverParams &P)
         }
     }
 }
-
-// 重构无粘通量
-void compute_flux_face(Field3D &F, const SolverParams &P)
-{
-    const LocalDesc &L = F.L;
-    const int nx = L.sx, ny = L.sy, nz = L.sz;
-    const int ngh = L.ngx;  // ghost层个数
-    const double eps = 1e-6;
-
-    // selection of reconstruction method
-    auto recon_method = P.recon;
-
-    // ----------------- X方向半节点通量 -----------------
-    for (int k = 0; k < nz; ++k)
-    for (int j = 0; j < ny; ++j)
-    for (int i = 2; i < nx - 2; ++i) {
-        int ids[5] = { F.I(i-2,j,k), F.I(i-1,j,k), F.I(i,j,k), F.I(i+1,j,k), F.I(i+2,j,k) };
-        int fid  = idx_fx(i, j, k, L);
-
-        // 使用数组指针避免 switch/case：构建源/目标数组指针表
-        std::array<std::vector<double>*,5> src_vec_x = {
-            &F.Fflux_mass, &F.Fflux_momx, &F.Fflux_momy, &F.Fflux_momz, &F.Fflux_E
-        };
-        std::array<std::vector<double>*,5> dst_vec_x = {
-            &F.flux_fx_mass, &F.flux_fx_momx, &F.flux_fx_momy, &F.flux_fx_momz, &F.flux_fx_E
-        };
-
-        std::array<double,5> st;
-        for (int comp = 0; comp < 5; ++comp) {
-            double *src = src_vec_x[comp]->data();
-            double *dst = dst_vec_x[comp]->data();
-
-            for (int s = 0; s < 5; ++s) st[s] = src[ids[s]];
-
-            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
-                         ? linear_reconstruction(st)
-                         : weno5_reconstruction(st);
-
-            dst[fid] = val;
-        }
-    }
-
-    // ----------------- Y方向半节点通量 -----------------
-    for (int k = 0; k < nz; ++k)
-    for (int i = 0; i < nx; ++i)
-    for (int j = 2; j < ny - 2; ++j) {
-        int ids[5] = { F.I(i,j-2,k), F.I(i,j-1,k), F.I(i,j,k), F.I(i,j+1,k), F.I(i,j+2,k) };
-        int fid  = idx_fy(i, j, k, L);
-
-        std::array<std::vector<double>*,5> src_vec_y = {
-            &F.Hflux_mass, &F.Hflux_momx, &F.Hflux_momy, &F.Hflux_momz, &F.Hflux_E
-        };
-        std::array<std::vector<double>*,5> dst_vec_y = {
-            &F.flux_fy_mass, &F.flux_fy_momx, &F.flux_fy_momy, &F.flux_fy_momz, &F.flux_fy_E
-        };
-
-        std::array<double,5> sty;
-        for (int comp = 0; comp < 5; ++comp) {
-            double *src = src_vec_y[comp]->data();
-            double *dst = dst_vec_y[comp]->data();
-
-            for (int s = 0; s < 5; ++s) sty[s] = src[ids[s]];
-
-            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
-                         ? linear_reconstruction(sty)
-                         : weno5_reconstruction(sty);
-
-            dst[fid] = val;
-        }
-    }
-
-    // ----------------- Z方向半节点通量 -----------------
-    for (int j = 0; j < ny; ++j)
-    for (int i = 0; i < nx; ++i)
-    for (int k = 2; k < nz - 2; ++k) {
-        int ids[5] = { F.I(i,j,k-2), F.I(i,j,k-1), F.I(i,j,k), F.I(i,j,k+1), F.I(i,j,k+2) };
-        int fid  = idx_fz(i, j, k, L);
-
-        std::array<std::vector<double>*,5> src_vec_z = {
-            &F.Gflux_mass, &F.Gflux_momx, &F.Gflux_momy, &F.Gflux_momz, &F.Gflux_E
-        };
-        std::array<std::vector<double>*,5> dst_vec_z = {
-            &F.flux_fz_mass, &F.flux_fz_momx, &F.flux_fz_momy, &F.flux_fz_momz, &F.flux_fz_E
-        };
-
-        std::array<double,5> stz;
-        for (int comp = 0; comp < 5; ++comp) {
-            double *src = src_vec_z[comp]->data();
-            double *dst = dst_vec_z[comp]->data();
-
-            for (int s = 0; s < 5; ++s) stz[s] = src[ids[s]];
-
-            double val = (recon_method == SolverParams::Reconstruction::LINEAR)
-                         ? linear_reconstruction(stz)
-                         : weno5_reconstruction(stz);
-
-            dst[fid] = val;
-        }
-    }
-}
-
-// -----------------------------------------------------------------
-// ---------   Flux Vector Splitting (FVS) -------------------------
-// -----------------------------------------------------------------
 
 // FVS main 计算通量的重构值
 void computeFVSFluxes(Field3D &F, const SolverParams &P)
@@ -194,7 +94,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 }
 
                 std::vector<double> Fface(VAR, 0.0);
-                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/0);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/0);
 
                 int face_i = i-1;
                 int fid = idx_fx(face_i, j, k, L);
@@ -238,7 +138,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 }
 
                 std::vector<double> Fface(VAR, 0.0);
-                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/1);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/1);
 
                 int face_j = j-1;
                 int fid = idx_fy(i, face_j, k, L);
@@ -282,7 +182,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 }
 
                 std::vector<double> Fface(VAR, 0.0);
-                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*sigma=*/1.0, /*dim=*/2);
+                reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/2);
 
                 int face_k = k-1;
                 int fid = idx_fz(i, j, face_k, L);
@@ -324,8 +224,9 @@ void computeRoeAveragedState(double &rho_bar, double &rhou_bar, double &rhov_bar
     rhou_bar = (sqrt_rho_L * u_L + sqrt_rho_R * u_R) * denom;
     rhov_bar = (sqrt_rho_L * v_L + sqrt_rho_R * v_R) * denom;
     rhow_bar = (sqrt_rho_L * w_L + sqrt_rho_R * w_R) * denom;
-    double H_L = (p_L / (gamma - 1.0) + 0.5 * rho_L * (u_L*u_L + v_L*v_L + w_L*w_L)) / rho_L;
-    double H_R = (p_R / (gamma - 1.0) + 0.5 * rho_R * (u_R*u_R + v_R*v_R + w_R*w_R)) / rho_R;
+    // Total specific enthalpy H = (E + p) / rho. Here Ul[4] and Ur[4] are the total energy (conserved E).
+    double H_L = (Ul[4] + p_L) / rho_L;
+    double H_R = (Ur[4] + p_R) / rho_R;
     h_bar = (sqrt_rho_L * H_L + sqrt_rho_R * H_R) * denom;
     double kinetic_bar = 0.5 * (rhou_bar*rhou_bar + rhov_bar*rhov_bar + rhow_bar*rhow_bar);
     a_bar = std::sqrt((gamma - 1.0) * (h_bar - kinetic_bar));
@@ -441,10 +342,11 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
                              const std::vector<std::vector<double>> &Ft,
                              const std::vector<std::vector<double>> &Ut,
                              const std::vector<std::vector<double>> &ut,
-                             const SolverParams &P, double sigma, int dim)
+                             const SolverParams &P, int dim)
 {
     // alias
     double gamma = P.gamma;
+    bool sigma = P.char_recon;
     const int VAR = 5; // 变量个数：rho, rhou, rhov, rhow, E
     // Use runtime stencil size from SolverParams so different reconstructions
     // (WENO5, C6th, ...) can be selected at runtime.
@@ -490,14 +392,14 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
             double gmax = 0.0;
             for (int m = 0; m < stencil; ++m)
                 for (int n = 0; n < VAR; ++n)
-                    gmax = std::max(gmax, abs(lamda[n][m]));
+                    gmax = std::max(gmax, std::abs(lamda[n][m]));
             for (int n = 0; n < VAR; ++n) lamdamax[n] = gmax;
         } break;
         case SolverParams::FVS_Type::LaxFriedrichs: {
             // Local Lax-Friedrichs: per-component max over stencil
             for (int n = 0; n < VAR; ++n) {
                 double mxx = 0.0;
-                for (int m = 0; m < stencil; ++m) mxx = std::max(mxx, abs(lamda[n][m]));
+                for (int m = 0; m < stencil; ++m) mxx = std::max(mxx, std::abs(lamda[n][m]));
                 lamdamax[n] = mxx;
             }
         } break;
@@ -512,8 +414,8 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
         } break;
     }
 
-    // 5) component-wise cheap option (sigma ~ 1.0 in your reference)
-    if (abs(sigma - 1.0) < 1e-12) {
+    // 5) component-wise cheap option
+    if (!sigma) {
         // For each component n, form wtplus = 0.5*(Ft + lamdamax * Ut) across stencil
         std::vector<double> wface(VAR, 0.0);
         for (int n = 0; n < VAR; ++n) {
@@ -567,7 +469,6 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
         Fface[n] = sum;
     }
 }
-
 
 // 计算空间导数
 void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)
@@ -674,7 +575,7 @@ void compute_viscous_flux(Field3D &F, const SolverParams &P)
 }
 
 // 重构粘性通量
-void compute_vis_flux_face(Field3D &F, const SolverParams &P)
+void reconstructViscidFlux(Field3D &F, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const int nx = L.sx, ny = L.sy, nz = L.sz;

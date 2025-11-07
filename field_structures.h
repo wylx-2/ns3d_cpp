@@ -54,6 +54,15 @@ struct LocalDesc {
     int nbr_xm=-1, nbr_xp=-1;
     int nbr_ym=-1, nbr_yp=-1;
     int nbr_zm=-1, nbr_zp=-1;
+
+    // boundary types at each side (if neighbor is MPI_PROC_NULL)
+    enum class BCType { Periodic, Wall, Symmetry, Outflow };
+    BCType bc_xmin = BCType::Periodic;
+    BCType bc_xmax = BCType::Periodic;
+    BCType bc_ymin = BCType::Periodic;
+    BCType bc_ymax = BCType::Periodic;
+    BCType bc_zmin = BCType::Periodic;
+    BCType bc_zmax = BCType::Periodic;
 };
 
 // --------------------------- indexing helpers --------------------------------
@@ -104,6 +113,8 @@ struct SolverParams {
     Reconstruction recon_vis = Reconstruction::C6th;
     // runtime stencil size for reconstructions (e.g., 5 for WENO5)
     int stencil = 5;
+    // characteristic-wise or component-wise reconstruction
+    bool char_recon = true;
 };
 
 // --------------------------- Halo exchange requests --------------------------

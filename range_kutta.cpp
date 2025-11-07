@@ -25,7 +25,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     // 计算无粘通量
     compute_flux(F, P);
     // 重构无粘通量
-    compute_flux_face(F, P);
+    computeFVSFluxes(F, P);
 
     // 计算空间导数
     compute_gradients(F, G, P);
@@ -34,7 +34,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     // 计算粘性通量
     compute_viscous_flux(F, P);
     // 重构粘性通量
-    compute_vis_flux_face(F, P);
+    reconstructViscidFlux(F, P);
 
     // 使用面通量计算 RHS（有限体积散度），只对物理单元计算
     // dQ/dt = - [ (F_x(i+1/2)-F_x(i-1/2))/dx + (F_y(j+1/2)-F_y(j-1/2))/dy + (F_z(k+1/2)-F_z(k-1/2))/dz ]
@@ -231,7 +231,7 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
     MPI_Allreduce(&count, &g_N, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     // input diagnostics
-    F.global_Etot = g_E;
+    F.global_Etot = g_E*F.L.nx*F.L.ny*F.L.nz;
     // residual = (g_sum_abs_res_rho / g_N) / g_max_abs_rho;
     F.global_res_rho = std::sqrt( (g_sum_sq_res_rho / g_N) ) / g_max_abs_rho;
     F.global_res_rhou = std::sqrt( (g_sum_sq_res_rhou / g_N) ) / g_max_abs_rhou;

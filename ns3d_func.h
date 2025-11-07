@@ -7,6 +7,19 @@
 #include <iostream>
 #include <string>
 
+// 初始化流场
+// 均匀场
+void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams &P);
+
+// 2D Riemann 问题初始条件
+void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
+
+// 边界条件处理函数
+void apply_boundary_conditions(Field3D &F, const GridDesc &G, const SolverParams &P,
+                               LocalDesc::BCType bc_xmin, LocalDesc::BCType bc_xmax,
+                               LocalDesc::BCType bc_ymin, LocalDesc::BCType bc_ymax,
+                               LocalDesc::BCType bc_zmin, LocalDesc::BCType bc_zmax);
+
 /// 基础欧拉通量函数
 inline void flux_euler(double rho, double u, double v, double w,
                 double p, double E, double F[5]);
@@ -47,8 +60,28 @@ void compute_flux_fd_x(Field3D &F, const GridDesc &G, const SolverParams &P);
 // 计算无粘通量
 void compute_flux(Field3D &F, const SolverParams &P);
 
+// 计算数值无粘通量
+void computeFVSFluxes(Field3D &F, const SolverParams &P);
+
 // 重构无粘通量
-void compute_flux_face(Field3D &F, const SolverParams &P);
+void reconstructInviscidFlux(std::vector<double> &Fface,
+                             const std::vector<std::vector<double>> &Ft,
+                             const std::vector<std::vector<double>> &Ut,
+                             const std::vector<std::vector<double>> &ut,
+                             const SolverParams &P, int dim);
+
+// 计算 Roe 平均态
+void computeRoeAveragedState(double &rho_bar, double &rhou_bar, double &rhov_bar, double &rhow_bar,
+                             double &h_bar, double &a_bar,
+                             const double Ul[5], const double Ur[5],
+                             double gamma);
+
+// 计算特征分解
+static void build_eigen_matrices(const double Ul[5], const double Ur[5],
+                                 double nx, double ny, double nz,
+                                 double gamma,
+                                 double Lmat[5][5], double Rmat[5][5],
+                                 double lambar[5]);
 
 // 计算空间导数
 void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P);
@@ -57,7 +90,7 @@ void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P);
 void compute_viscous_flux(Field3D &F, const SolverParams &P);
 
 // 重构粘性通量
-void compute_vis_flux_face(Field3D &F, const SolverParams &P);
+void reconstructViscidFlux(Field3D &F, const SolverParams &P);
 
 // Output full field in Tecplot ASCII format (per-rank file). Prefix will be used for filename: <prefix>_rank<id>.dat
 // time: physical time to label the output (optional, default 0.0)
