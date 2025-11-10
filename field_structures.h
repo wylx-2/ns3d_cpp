@@ -40,7 +40,7 @@ struct CartDecomp {
     int size = 1;
     int dims[3] = {1,1,1};   // px,py,pz
     int coords[3] = {0,0,0}; // coordinate of this rank
-    int periods[3] = {0,0,0};
+    int periods[3] = {0,0,0};// should be defined after SolverParams
 };
 
 // Local description per MPI rank. nx,ny,nz are local physical cells (without ghosts)
@@ -54,15 +54,6 @@ struct LocalDesc {
     int nbr_xm=-1, nbr_xp=-1;
     int nbr_ym=-1, nbr_yp=-1;
     int nbr_zm=-1, nbr_zp=-1;
-
-    // boundary types at each side (if neighbor is MPI_PROC_NULL)
-    enum class BCType { Periodic, Wall, Symmetry, Outflow };
-    BCType bc_xmin = BCType::Periodic;
-    BCType bc_xmax = BCType::Periodic;
-    BCType bc_ymin = BCType::Periodic;
-    BCType bc_ymax = BCType::Periodic;
-    BCType bc_zmin = BCType::Periodic;
-    BCType bc_zmax = BCType::Periodic;
 };
 
 // --------------------------- indexing helpers --------------------------------
@@ -115,6 +106,15 @@ struct SolverParams {
     int stencil = 5;
     // characteristic-wise or component-wise reconstruction
     bool char_recon = true;
+
+    // boundary types at each side (if neighbor is MPI_PROC_NULL)
+    enum class BCType { Periodic, Wall, Symmetry, Outflow };
+    BCType bc_xmin = BCType::Periodic;
+    BCType bc_xmax = BCType::Periodic;
+    BCType bc_ymin = BCType::Periodic;
+    BCType bc_ymax = BCType::Periodic;
+    BCType bc_zmin = BCType::Periodic;
+    BCType bc_zmax = BCType::Periodic;
 };
 
 // --------------------------- Halo exchange requests --------------------------
@@ -788,18 +788,8 @@ inline void exchange_halos_conserved(Field3D &F, CartDecomp &C, LocalDesc &L, Ha
 // --------------------------- Utilities: initialize cart / local sizes ----------
 
 // Build a Cartesian communicator and fill CartDecomp
-inline void build_cart_decomp(CartDecomp &C, int px, int py, int pz, bool periodic=false) {
-    int ranks; MPI_Comm_size(MPI_COMM_WORLD, &ranks);
-    C.size = ranks;
-    MPI_Comm_rank(MPI_COMM_WORLD, &ranks);
-    C.rank = ranks;
-    C.dims[0] = px; C.dims[1] = py; C.dims[2] = pz;
-    C.periods[0] = periodic ? 1 : 0;
-    C.periods[1] = periodic ? 1 : 0;
-    C.periods[2] = periodic ? 1 : 0;
+inline void build_cart_decomp(CartDecomp &C) {
     MPI_Cart_create(MPI_COMM_WORLD, 3, C.dims, C.periods, /*reorder=*/0, &C.cart_comm);
-//    MPI_Comm_rank(C.cart_comm, &C.rank);
-//    MPI_Comm_size(C.cart_comm, &C.size);
     MPI_Cart_coords(C.cart_comm, C.rank, 3, C.coords);
 }
 

@@ -7,6 +7,9 @@
 #include <iostream>
 #include <string>
 
+// 初始化求解参数
+void initialize_SolverParams(SolverParams &P, CartDecomp &C);
+
 // 初始化流场
 // 均匀场
 void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams &P);
@@ -15,10 +18,7 @@ void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams 
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 边界条件处理函数
-void apply_boundary_conditions(Field3D &F, const GridDesc &G, const SolverParams &P,
-                               LocalDesc::BCType bc_xmin, LocalDesc::BCType bc_xmax,
-                               LocalDesc::BCType bc_ymin, LocalDesc::BCType bc_ymax,
-                               LocalDesc::BCType bc_zmin, LocalDesc::BCType bc_zmax);
+void apply_boundary_conditions(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 /// 基础欧拉通量函数
 inline void flux_euler(double rho, double u, double v, double w,

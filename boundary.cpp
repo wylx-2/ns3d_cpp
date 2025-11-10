@@ -6,10 +6,7 @@
 //------------------------------------------------------------
 // 边界更新核心函数
 //------------------------------------------------------------
-void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C,
-                    LocalDesc::BCType bc_xmin, LocalDesc::BCType bc_xmax,
-                    LocalDesc::BCType bc_ymin, LocalDesc::BCType bc_ymax,
-                    LocalDesc::BCType bc_zmin, LocalDesc::BCType bc_zmax)
+void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
 {
     LocalDesc &L = F.L;
     const int ng = L.ngx;  // 假定三个方向 ghost 一样
@@ -30,7 +27,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C,
     //--------------------------------------------
     // ---- XMIN / XMAX ----
     if (L.nbr_xm == MPI_PROC_NULL) {
-        if (bc_xmin == LocalDesc::BCType::Wall || bc_xmin == LocalDesc::BCType::Symmetry) {
+        if (P.bc_xmin == LocalDesc::BCType::Wall || P.bc_xmin == LocalDesc::BCType::Symmetry) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<ng;++i) {

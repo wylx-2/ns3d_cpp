@@ -2,6 +2,63 @@
 #include <cmath>
 #include <iostream>
 
+void initialize_SolverParams(SolverParams &P, CartDecomp &C)
+{
+    // Default parameters are already set in the struct definition
+    // Modify any parameters here if needed
+    P.gamma = 1.4;
+    P.mu = 1.0e-3;
+    P.Pr = 0.71;
+    P.Rgas = 287.058;
+    P.cfl = 0.5;
+    P.use_periodic = false;
+    P.fvs_type = SolverParams::FVS_Type::StegerWarming;
+    P.recon = SolverParams::Reconstruction::WENO5;
+    P.recon_vis = SolverParams::Reconstruction::C6th;
+    P.stencil = 5;
+    P.char_recon = true;
+
+    P.bc_xmin = SolverParams::BCType::Periodic;
+    P.bc_xmax = SolverParams::BCType::Periodic;
+    P.bc_ymin = SolverParams::BCType::Periodic;
+    P.bc_ymax = SolverParams::BCType::Periodic;
+    P.bc_zmin = SolverParams::BCType::Periodic;
+    P.bc_zmax = SolverParams::BCType::Periodic;
+
+    // Parameter settings can be modified here if needed
+    // use MPI_Dims_create to choose a good px,py,pz
+    int sizes; MPI_Comm_size(MPI_COMM_WORLD, &sizes);C.size = sizes;
+    int rank_num; MPI_Comm_rank(MPI_COMM_WORLD, &rank_num);C.rank = rank_num;
+    MPI_Dims_create(sizes, 3, C.dims);
+    if(P.bc_xmax == SolverParams::BCType::Periodic)
+    {
+        // check if bc_xmin/xmax are both periodic
+        if(P.bc_xmin != SolverParams::BCType::Periodic) {
+            std::cerr << "Error: Inconsistent periodic BCs in x-direction!" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, -1); 
+        }
+        C.periods[0] = 1;
+    }
+    if(P.bc_ymax == SolverParams::BCType::Periodic)
+    {
+        // check if bc_ymin/ymax are both periodic
+        if(P.bc_ymin != SolverParams::BCType::Periodic) {
+            std::cerr << "Error: Inconsistent periodic BCs in y-direction!" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, -1); 
+        }
+        C.periods[1] = 1;
+    }
+    if(P.bc_zmax == SolverParams::BCType::Periodic)
+    {
+        // check if bc_zmin/zmax are both periodic
+        if(P.bc_zmin != SolverParams::BCType::Periodic) {
+            std::cerr << "Error: Inconsistent periodic BCs in z-direction!" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        C.periods[2] = 1;
+    }
+}
+
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;

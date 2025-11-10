@@ -9,19 +9,17 @@
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     CartDecomp C;
-    // use MPI_Dims_create to choose a good px,py,pz
-    int ranks; MPI_Comm_size(MPI_COMM_WORLD, &ranks);
-    int dims[3] = {0,0,0}; MPI_Dims_create(ranks, 3, dims);
-    build_cart_decomp(C, dims[0], dims[1], dims[2], /*periodic*/true);
+    SolverParams P;
+    // initialize SolverParams
+    initialize_SolverParams(P, C);
+    build_cart_decomp(C);
 
-    GridDesc G; G.global_nx = 64; G.global_ny = 64; G.global_nz = 64; G.dx = G.dy = G.dz = 1.0/64.0;
+    GridDesc G; G.global_nx = 16; G.global_ny = 16; G.global_nz = 16; G.dx = G.dy = G.dz = 1.0/16.0;
 
     int ghost_layers = 3;
     LocalDesc L; compute_local_desc(G, C, L, /*ghosts*/ghost_layers,ghost_layers,ghost_layers);
 
     Field3D F; F.allocate(L);
-
-    SolverParams P;
 
     // Initialize field
     initialize_uniform_field(F, G, P);
