@@ -22,15 +22,13 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     std::fill(F.rhs_rhow.begin(), F.rhs_rhow.end(), 0.0);
     std::fill(F.rhs_E.begin(), F.rhs_E.end(), 0.0);
 
-    // 计算无粘通量
-    compute_flux(F, P);
-    // 重构无粘通量
+    // FVS计算无粘通量
     computeFVSFluxes(F, P);
 
     // 计算空间导数
     compute_gradients(F, G, P);
     // 同步不同进程的ghost区域空间导数
-    exchange_halos_gradients(F, C, L, out_reqs);
+    exchange_halos_gradients(F, C, L, out_reqs); //还需要额外边界处理！
     // 计算粘性通量
     compute_viscous_flux(F, P);
     // 重构粘性通量
@@ -95,50 +93,47 @@ void runge_kutta_3(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, Halo
     LocalDesc &L = F.L;
     const int N = F.rho.size();
 
-    std::vector<double> rho0 = F.rho;
-    std::vector<double> rhou0 = F.rhou;
-    std::vector<double> rhov0 = F.rhov;
-    std::vector<double> rhow0 = F.rhow;
-    std::vector<double> E0 = F.E;
-
     // Stage 1
     compute_rhs(F, C, G, P, out_reqs);
     for (int n = 0; n < N; ++n)
     {
-        F.rho[n] = rho0[n] + dt * F.rhs_rho[n];
-        F.rhou[n] = rhou0[n] + dt * F.rhs_rhou[n];
-        F.rhov[n] = rhov0[n] + dt * F.rhs_rhov[n];
-        F.rhow[n] = rhow0[n] + dt * F.rhs_rhow[n];
-        F.E[n] = E0[n] + dt * F.rhs_E[n];
+        F.rho[n] = F.rho0[n] + dt * F.rhs_rho[n];
+        F.rhou[n] = F.rhou0[n] + dt * F.rhs_rhou[n];
+        F.rhov[n] = F.rhov0[n] + dt * F.rhs_rhov[n];
+        F.rhow[n] = F.rhow0[n] + dt * F.rhs_rhow[n];
+        F.E[n] = F.E0[n] + dt * F.rhs_E[n];
     }
-    exchange_halos_conserved(F, C, L, out_reqs);
     F.conservedToPrimitive(P);
+    apply_boundary(F, G, C, P);
+    F.primitiveToConserved(P);
 
     // Stage 2
     compute_rhs(F, C, G, P, out_reqs);
     for (int n = 0; n < N; ++n)
     {
-        F.rho[n] = 0.75 * rho0[n] + 0.25 * (F.rho[n] + dt * F.rhs_rho[n]);
-        F.rhou[n] = 0.75 * rhou0[n] + 0.25 * (F.rhou[n] + dt * F.rhs_rhou[n]);
-        F.rhov[n] = 0.75 * rhov0[n] + 0.25 * (F.rhov[n] + dt * F.rhs_rhov[n]);
-        F.rhow[n] = 0.75 * rhow0[n] + 0.25 * (F.rhow[n] + dt * F.rhs_rhow[n]);
-        F.E[n] = 0.75 * E0[n] + 0.25 * (F.E[n] + dt * F.rhs_E[n]);
+        F.rho[n] = 0.75 * F.rho0[n] + 0.25 * (F.rho[n] + dt * F.rhs_rho[n]);
+        F.rhou[n] = 0.75 * F.rhou0[n] + 0.25 * (F.rhou[n] + dt * F.rhs_rhou[n]);
+        F.rhov[n] = 0.75 * F.rhov0[n] + 0.25 * (F.rhov[n] + dt * F.rhs_rhov[n]);
+        F.rhow[n] = 0.75 * F.rhow0[n] + 0.25 * (F.rhow[n] + dt * F.rhs_rhow[n]);
+        F.E[n] = 0.75 * F.E0[n] + 0.25 * (F.E[n] + dt * F.rhs_E[n]);
     }
-    exchange_halos_conserved(F, C, L, out_reqs);
     F.conservedToPrimitive(P);
+    apply_boundary(F, G, C, P);
+    F.primitiveToConserved(P);
 
     // Stage 3
     compute_rhs(F, C, G, P, out_reqs);
     for (int n = 0; n < N; ++n)
     {
-        F.rho[n] = (1.0 / 3.0) * rho0[n] + (2.0 / 3.0) * (F.rho[n] + dt * F.rhs_rho[n]);
-        F.rhou[n] = (1.0 / 3.0) * rhou0[n] + (2.0 / 3.0) * (F.rhou[n] + dt * F.rhs_rhou[n]);
-        F.rhov[n] = (1.0 / 3.0) * rhov0[n] + (2.0 / 3.0) * (F.rhov[n] + dt * F.rhs_rhov[n]);
-        F.rhow[n] = (1.0 / 3.0) * rhow0[n] + (2.0 / 3.0) * (F.rhow[n] + dt * F.rhs_rhow[n]);
-        F.E[n] = (1.0 / 3.0) * E0[n] + (2.0 / 3.0) * (F.E[n] + dt * F.rhs_E[n]);
+        F.rho[n] = (1.0 / 3.0) * F.rho0[n] + (2.0 / 3.0) * (F.rho[n] + dt * F.rhs_rho[n]);
+        F.rhou[n] = (1.0 / 3.0) * F.rhou0[n] + (2.0 / 3.0) * (F.rhou[n] + dt * F.rhs_rhou[n]);
+        F.rhov[n] = (1.0 / 3.0) * F.rhov0[n] + (2.0 / 3.0) * (F.rhov[n] + dt * F.rhs_rhov[n]);
+        F.rhow[n] = (1.0 / 3.0) * F.rhow0[n] + (2.0 / 3.0) * (F.rhow[n] + dt * F.rhs_rhow[n]);
+        F.E[n] = (1.0 / 3.0) * F.E0[n] + (2.0 / 3.0) * (F.E[n] + dt * F.rhs_E[n]);
     }
-    exchange_halos_conserved(F, C, L, out_reqs);
     F.conservedToPrimitive(P);
+    apply_boundary(F, G, C, P);
+    F.primitiveToConserved(P);
 }
 
 // -----------------------------------------------------------------------------

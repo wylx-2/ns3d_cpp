@@ -57,23 +57,24 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     compute_flux(F, P);
 
     const LocalDesc &L = F.L;
-    int nx = L.sx, ny = L.sy, nz = L.sz;
+    int nx = L.nx, ny = L.ny, nz = L.nz;
+    int ngx = L.ngx, ngy = L.ngy, ngz = L.ngz;
     const int VAR = 5; // 变量个数：rho, rhou, rhov, rhow, E
     // Use runtime stencil size from SolverParams so different reconstructions
     // (WENO5, C6th, ...) can be selected at runtime.
     int stencil = P.stencil;
 
     // X方向通量重构
-    for (int k = 0; k < nz; ++k) {
-        for (int j = 0; j < ny; ++j) {
-            for (int i = 2; i < nx - 2; ++i) {
+    for (int k = ngz; k < ngz+nz; ++k) {
+        for (int j = ngy; j < ngy+ny; ++j) {
+            for (int i = ngx-1; i < ngx+nx; ++i) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
 
                 for (int m = 0; m < stencil; ++m) {
-                    int ii = i + (m - (stencil/2));
+                    int ii = i + (m - (stencil/2)); // 以i为中心的stencil(6点模板为i-2到i+3)
                     int id = F.I(ii, j, k);
 
                     Ft[0][m] = F.Fflux_mass[id];
@@ -96,8 +97,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 std::vector<double> Fface(VAR, 0.0);
                 reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/0);
 
-                int face_i = i-1;
-                int fid = idx_fx(face_i, j, k, L);
+                int fid = idx_fx(i, j, k, L);
                 F.flux_fx_mass[fid] = Fface[0];
                 F.flux_fx_momx[fid] = Fface[1];
                 F.flux_fx_momy[fid] = Fface[2];
@@ -108,9 +108,9 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     }
 
     // Y方向通量重构
-    for (int k = 0; k < nz; ++k) {
-        for (int i = 0; i < nx; ++i) {
-            for (int j = 2; j < ny - 2; ++j) {
+    for (int k = ngz; k < ngz+nz; ++k) {
+        for (int i = ngx; i < ngx+nx; ++i) {
+            for (int j = ngy-1; j < ngy+ny; ++j) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
@@ -140,8 +140,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 std::vector<double> Fface(VAR, 0.0);
                 reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/1);
 
-                int face_j = j-1;
-                int fid = idx_fy(i, face_j, k, L);
+                int fid = idx_fy(i, j, k, L);
                 F.flux_fy_mass[fid] = Fface[0];
                 F.flux_fy_momx[fid] = Fface[1];
                 F.flux_fy_momy[fid] = Fface[2];
@@ -152,9 +151,9 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     }
 
     // Z方向通量重构
-    for (int j = 0; j < ny; ++j) {
-        for (int i = 0; i < nx; ++i) {
-            for (int k = 2; k < nz - 2; ++k) {
+    for (int j = ngy; j < ngy+ny; ++j) {
+        for (int i = ngx; i < ngx+nx; ++i) {
+            for (int k = ngz-1; k < ngz+nz; ++k) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
@@ -184,8 +183,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
                 std::vector<double> Fface(VAR, 0.0);
                 reconstructInviscidFlux(Fface, Ft, Ut, ut, P, /*dim=*/2);
 
-                int face_k = k-1;
-                int fid = idx_fz(i, j, face_k, L);
+                int fid = idx_fz(i, j, k, L);
                 F.flux_fz_mass[fid] = Fface[0];
                 F.flux_fz_momx[fid] = Fface[1];
                 F.flux_fz_momy[fid] = Fface[2];
@@ -424,8 +422,8 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
                 wplus[m]  = 0.5 * (Ft[n][m] + lamdamax[n] * Ut[n][m]);
                 wminus[m] = 0.5 * (Ft[n][m] - lamdamax[n] * Ut[n][m]);
             }
-            double plus_face = reconstruct_select(wplus, +1.0, P.recon);
-            double minus_face = reconstruct_select(wminus, -1.0, P.recon);
+            double plus_face = reconstruct_select(wplus, +1.0, P);
+            double minus_face = reconstruct_select(wminus, -1.0, P);
             wface[n] = plus_face + minus_face;
         }
         // component-wise result is wface in conservative flux-like variables
@@ -457,8 +455,8 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
             wtplus[m] = 0.5 * (wchar[n][m] + lamdamax[n] * LU[n][m]);
             wtminus[m] = 0.5 * (wchar[n][m] - lamdamax[n] * LU[n][m]);
         }
-        double plus_face = reconstruct_select(wtplus, +1.0, P.recon);
-        double minus_face = reconstruct_select(wtminus, -1.0, P.recon);
+        double plus_face = reconstruct_select(wtplus, +1.0, P);
+        double minus_face = reconstruct_select(wtminus, -1.0, P);
         wflux_char[n] = plus_face + minus_face;
     }
 
@@ -475,12 +473,14 @@ void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const double dx = G.dx, dy = G.dy, dz = G.dz;
+    int nx = L.nx, ny = L.ny, nz = L.nz;
+    int ngx = L.ngx, ngy = L.ngy, ngz = L.ngz;
 
     // Compute 6th-order central differences only for interior (non-ghost) points.
     // Assumes ghost layers exist; we compute for i/j/k in [3, L.* - 4] so +/-3 stencil fits.
-    for (int k = 3; k <= L.sz - 4; ++k)
-    for (int j = 3; j <= L.sy - 4; ++j)
-    for (int i = 3; i <= L.sx - 4; ++i)
+    for (int k = ngz; k < ngz+nz; ++k)
+    for (int j = ngy; j < ngy+ny; ++j)
+    for (int i = ngx; i < ngx+nx; ++i)
     {
         int id = F.I(i, j, k);
 
@@ -526,9 +526,9 @@ void compute_viscous_flux(Field3D &F, const SolverParams &P)
     const double Pr = P.Pr;
     const double Cp = gamma * Rgas / (gamma - 1.0);
 
-    for (int k = 1; k < L.sz - 1; ++k)
-    for (int j = 1; j < L.sy - 1; ++j)
-    for (int i = 1; i < L.sx - 1; ++i)
+    for (int k = 0; k < L.sz; ++k)
+    for (int j = 0; j < L.sy; ++j)
+    for (int i = 0; i < L.sx; ++i)
     {
         int id = F.I(i, j, k);
 
@@ -578,22 +578,17 @@ void compute_viscous_flux(Field3D &F, const SolverParams &P)
 void reconstructViscidFlux(Field3D &F, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
-    const int nx = L.sx, ny = L.sy, nz = L.sz;
-
-    // Use c6th reconstruction from reconstruction.cpp when requested; that expects
-    // a 6-point scalar stencil (i-2 .. i+3) and returns a single reconstructed value.
-    // Fallback: if recon_vis != C6th, keep previous simple 7-point weights.
-    bool use_c6 = (P.recon_vis == SolverParams::Reconstruction::C6th);
+    const int nx = L.nx, ny = L.ny, nz = L.nz;
+    const int ngx = L.ngx, ngy = L.ngy, ngz = L.ngz;
 
     // ----------------- X方向粘性半节点通量 -----------------
-    for (int k = 0; k < nz; ++k)
-    for (int j = 0; j < ny; ++j)
-    for (int i = 2; i <= nx - 4; ++i) {
+    for (int k = ngz; k < ngz+nz; ++k)
+    for (int j = ngy; j < ngy+ny; ++j)
+    for (int i = ngx-1; i < ngx+nx; ++i) {
         int fid = idx_fx(i, j, k, L);
 
         std::array<std::vector<double>*,5> src = { &F.Fvflux_mass, &F.Fvflux_momx, &F.Fvflux_momy, &F.Fvflux_momz, &F.Fvflux_E };
         std::array<std::vector<double>*,5> dst = { &F.flux_fx_mass, &F.flux_fx_momx, &F.flux_fx_momy, &F.flux_fx_momz, &F.flux_fx_E };
-
 
         int ids6[6] = { F.I(i-2,j,k), F.I(i-1,j,k), F.I(i,j,k), F.I(i+1,j,k), F.I(i+2,j,k), F.I(i+3,j,k) };
         std::array<double,6> s6;
@@ -607,9 +602,9 @@ void reconstructViscidFlux(Field3D &F, const SolverParams &P)
     }
 
     // ----------------- Y方向粘性半节点通量 -----------------
-    for (int k = 0; k < nz; ++k)
-    for (int i = 0; i < nx; ++i)
-    for (int j = 2; j <= ny - 4; ++j) {
+    for (int k = ngz; k < ngz+nz; ++k)
+    for (int i = ngx; i < ngx+nx; ++i)
+    for (int j = ngy-1; j < ngy+ny; ++j) {
         int fid = idx_fy(i, j, k, L);
 
         std::array<std::vector<double>*,5> src = { &F.Hvflux_mass, &F.Hvflux_momx, &F.Hvflux_momy, &F.Hvflux_momz, &F.Hvflux_E };
@@ -627,9 +622,9 @@ void reconstructViscidFlux(Field3D &F, const SolverParams &P)
     }
 
     // ----------------- Z方向粘性半节点通量 -----------------
-    for (int j = 0; j < ny; ++j)
-    for (int i = 0; i < nx; ++i)
-    for (int k = 2; k <= nz - 4; ++k) {
+    for (int j = ngy; j < ngy+ny; ++j)
+    for (int i = ngx; i < ngx+nx; ++i)
+    for (int k = ngz-1; k < ngz+nz; ++k) {
         int fid = idx_fz(i, j, k, L);
 
         std::array<std::vector<double>*,5> src = { &F.Gvflux_mass, &F.Gvflux_momx, &F.Gvflux_momy, &F.Gvflux_momz, &F.Gvflux_E };

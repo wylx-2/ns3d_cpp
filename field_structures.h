@@ -64,7 +64,9 @@ inline int idx3(int i, int j, int k, const LocalDesc &L) noexcept {
 }
 
 // face-centered indices for flux arrays
-// For X-faces (between i and i+1), there are (sx-1) faces in i-direction; physical faces count = nx+1
+// For X-faces (between i and i+1), there are (sx-1) faces in i-direction; 
+// physical faces count = nx+1, 
+// so for i_face used indeed is [ghosts-1, ghosts+nx-1]*[ghosts, ghosts+nx-1]*[ghosts, ghosts+nz-1]
 inline int idx_fx(int i_face, int j, int k, const LocalDesc &L) noexcept {
     // i_face in [0, sx-2]
     return (k * L.sy + j) * (L.sx - 1) + i_face;
@@ -100,10 +102,14 @@ struct SolverParams {
         C6th,      // Sixth-order central difference
         C4th       // Fourth-order central difference
     };
-    Reconstruction recon = Reconstruction::WENO5;
+    Reconstruction recon = Reconstruction::MDCD;
     Reconstruction recon_vis = Reconstruction::C6th;
-    // runtime stencil size for reconstructions (e.g., 5 for WENO5)
-    int stencil = 5;
+    double mdcd_diss = 0.01;  // MDCD dissipation coefficient
+    double mdcd_disp = 0.0463783;  // MDCD dispersion coefficient
+
+    // runtime stencil size for reconstructions
+    int stencil = 6;
+    int ghost_layers = 3;
     // characteristic-wise or component-wise reconstruction
     bool char_recon = true;
 
@@ -115,6 +121,12 @@ struct SolverParams {
     BCType bc_ymax = BCType::Periodic;
     BCType bc_zmin = BCType::Periodic;
     BCType bc_zmax = BCType::Periodic;
+
+    // simulation control
+    int max_steps = 1000;
+    int monitor_freq = 100;
+    int output_freq = 200;
+    double TotalTime = 10.0;
 };
 
 // --------------------------- Halo exchange requests --------------------------
@@ -181,7 +193,7 @@ struct Field3D {
         L.sz = L.nz + 2*L.ngz;
         const int tot = L.sx * L.sy * L.sz;
 
-        rho.assign(tot, 0.0);
+        rho.assign(tot, 1.0);
         rhou.assign(tot, 0.0);
         rhov.assign(tot, 0.0);
         rhow.assign(tot, 0.0);
@@ -260,7 +272,6 @@ struct Field3D {
         dT_dy.assign(tot, 0.0);
         dT_dz.assign(tot, 0.0);
 
-
         // allocate face arrays sizes:
         int fx_count = (L.sx - 1) * L.sy * L.sz; // faces between i and i+1
         int fy_count = L.sx * (L.sy - 1) * L.sz;
@@ -327,11 +338,7 @@ struct Field3D {
     inline double& Gflux_MomZ(int i, int j, int k) noexcept { return Gflux_momz[I(i,j,k)]; }
     inline double& Gflux_Energy(int i, int j, int k) noexcept { return Gflux_E[I(i,j,k)]; }
 
-    // face flux accessors (X faces)
-    inline int FxCount() const noexcept { return (L.sx-1) * L.sy * L.sz; }
-    inline int FyCount() const noexcept { return L.sx * (L.sy-1) * L.sz; }
-    inline int FzCount() const noexcept { return L.sx * L.sy * (L.sz-1); }
-
+    // accessors for face-centered fluxes
     inline double& FX_mass(int i_face, int j, int k) noexcept { return flux_fx_mass[idx_fx(i_face,j,k,L)]; }
     inline double& FX_momx(int i_face, int j, int k) noexcept { return flux_fx_momx[idx_fx(i_face,j,k,L)]; }
     inline double& FX_momy(int i_face, int j, int k) noexcept { return flux_fx_momy[idx_fx(i_face,j,k,L)]; }
@@ -373,6 +380,29 @@ struct Field3D {
                     T[id] = p[id] / (rr * par.Rgas);
                 }
     }
+
+    //convert primitive -> conserved for the inner domain (including ghost)
+    void primitiveToConserved(const SolverParams &par) {
+        const double gamma = par.gamma;
+        for (int k = 0; k < L.sz; ++k)
+            for (int j = 0; j < L.sy; ++j)
+                for (int i = 0; i < L.sx; ++i) {
+                    int id = I(i,j,k);
+                    double rr = rho[id];
+                    if (rr <= 0.0) {
+                        // avoid dividing by zero; set fallback small positive density
+                        rr = 1e-12; 
+                        rho[id] = rr;
+                    }
+                    rhou[id] = rr * u[id];
+                    rhov[id] = rr * v[id];
+                    rhow[id] = rr * w[id];
+                    double kinetic = 0.5 * (u[id]*u[id] + v[id]*v[id] + w[id]*w[id]);
+                    double e_internal = p[id] / ((gamma - 1.0) * rr);
+                    E[id] = rr * (e_internal + kinetic);
+                    T[id] = p[id] / (rr * par.Rgas);
+                }
+    }   
 
     // record current conserved variables into _0 arrays
     void recordConservedTo0() {
@@ -416,10 +446,10 @@ inline void pack_x_face_send(const Field3D &F, std::vector<double> &buf, int sen
                 int i = istart + ii;
                 int id = F.I(i,j,k);
                 buf[p++] = F.rho[id];
-                buf[p++] = F.rhou[id];
-                buf[p++] = F.rhov[id];
-                buf[p++] = F.rhow[id];
-                buf[p++] = F.E[id];
+                buf[p++] = F.u[id];
+                buf[p++] = F.v[id];
+                buf[p++] = F.w[id];
+                buf[p++] = F.p[id];
             }
         }
     }
@@ -439,10 +469,10 @@ inline void unpack_x_face_recv(Field3D &F, const std::vector<double> &buf, int r
                 int i = istart + ii;
                 int id = F.I(i,j,k);
                 F.rho[id]  = buf[p++];
-                F.rhou[id] = buf[p++];
-                F.rhov[id] = buf[p++];
-                F.rhow[id] = buf[p++];
-                F.E[id]    = buf[p++];
+                F.u[id] = buf[p++];
+                F.v[id] = buf[p++];
+                F.w[id] = buf[p++];
+                F.p[id] = buf[p++];
             }
         }
     }
@@ -462,10 +492,10 @@ inline void pack_y_face_send(const Field3D &F, std::vector<double> &buf, int sen
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
                 buf[p++] = F.rho[id];
-                buf[p++] = F.rhou[id];
-                buf[p++] = F.rhov[id];
-                buf[p++] = F.rhow[id];
-                buf[p++] = F.E[id];
+                buf[p++] = F.u[id];
+                buf[p++] = F.v[id];
+                buf[p++] = F.w[id];
+                buf[p++] = F.p[id];
             }
         }
     }
@@ -483,10 +513,10 @@ inline void unpack_y_face_recv(Field3D &F, const std::vector<double> &buf, int r
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
                 F.rho[id]  = buf[p++];
-                F.rhou[id] = buf[p++];
-                F.rhov[id] = buf[p++];
-                F.rhow[id] = buf[p++];
-                F.E[id]    = buf[p++];
+                F.u[id] = buf[p++];
+                F.v[id] = buf[p++];
+                F.w[id] = buf[p++];
+                F.p[id] = buf[p++];
             }
         }
     }
@@ -505,10 +535,10 @@ inline void pack_z_face_send(const Field3D &F, std::vector<double> &buf, int sen
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
                 buf[p++] = F.rho[id];
-                buf[p++] = F.rhou[id];
-                buf[p++] = F.rhov[id];
-                buf[p++] = F.rhow[id];
-                buf[p++] = F.E[id];
+                buf[p++] = F.u[id];
+                buf[p++] = F.v[id];
+                buf[p++] = F.w[id];
+                buf[p++] = F.p[id];
             }
         }
     }
@@ -526,10 +556,10 @@ inline void unpack_z_face_recv(Field3D &F, const std::vector<double> &buf, int r
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
                 F.rho[id]  = buf[p++];
-                F.rhou[id] = buf[p++];
-                F.rhov[id] = buf[p++];
-                F.rhow[id] = buf[p++];
-                F.E[id]    = buf[p++];
+                F.u[id] = buf[p++];
+                F.v[id] = buf[p++];
+                F.w[id] = buf[p++];
+                F.p[id] = buf[p++];
             }
         }
     }
@@ -725,7 +755,7 @@ inline void exchange_halos_gradients(Field3D &F, CartDecomp &C, LocalDesc &L, Ha
 
 // High-level halo exchange routine (non-blocking) for conserved variables
 // This exchanges ghost layers in x, y, z directions. It assumes periodic or neighbor ranks set in LocalDesc.
-inline void exchange_halos_conserved(Field3D &F, CartDecomp &C, LocalDesc &L, HaloRequests &out_reqs) {
+inline void exchange_halos_physical(Field3D &F, CartDecomp &C, LocalDesc &L, HaloRequests &out_reqs) {
     // compute buffer sizes
     int gx = L.ngx, gy = L.ngy, gz = L.ngz;
     int nx = L.nx, ny = L.ny, nz = L.nz;
@@ -794,7 +824,7 @@ inline void build_cart_decomp(CartDecomp &C) {
 }
 
 // Compute local sizes and neighbor ranks and set into LocalDesc L
-inline void compute_local_desc(const GridDesc &G, CartDecomp &C, LocalDesc &L, int ngx=1, int ngy=1, int ngz=1) {
+inline void compute_local_desc(const GridDesc &G, CartDecomp &C, LocalDesc &L, int ngx, int ngy, int ngz) {
     // split global grid into blocks; distribute remainder to lower coords
     int gx = C.dims[0], gy = C.dims[1], gz = C.dims[2];
     int px = C.coords[0], py = C.coords[1], pz = C.coords[2];

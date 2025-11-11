@@ -6,8 +6,9 @@
 //------------------------------------------------------------
 // 边界更新核心函数
 //------------------------------------------------------------
-void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
+void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P)
 {
+    // 更新ghost cells for physical variables
     LocalDesc &L = F.L;
     const int ng = L.ngx;  // 假定三个方向 ghost 一样
 
@@ -19,7 +20,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
     // Step 1. 先进行 MPI 边界交换
     //--------------------------------------------
     HaloRequests reqs;
-    exchange_halos_conserved(F, C, L, reqs);
+    exchange_halos_physical(F, C, L, reqs);
     MPI_Waitall(static_cast<int>(reqs.reqs.size()), reqs.reqs.data(), MPI_STATUSES_IGNORE);
 
     //--------------------------------------------
@@ -27,7 +28,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
     //--------------------------------------------
     // ---- XMIN / XMAX ----
     if (L.nbr_xm == MPI_PROC_NULL) {
-        if (P.bc_xmin == LocalDesc::BCType::Wall || P.bc_xmin == LocalDesc::BCType::Symmetry) {
+        if (P.bc_xmin == SolverParams::BCType::Wall || P.bc_xmin == SolverParams::BCType::Symmetry) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<ng;++i) {
@@ -37,27 +38,27 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
 
                 // 镜像
                 F.rho[idg]  = F.rho[idm];
-                F.rhou[idg] = -F.rhou[idm]; // 反射法向动量
-                F.rhov[idg] =  F.rhov[idm];
-                F.rhow[idg] =  F.rhow[idm];
-                F.E[idg]    =  F.E[idm];
+                F.u[idg] = -F.u[idm]; // 反射法向动量
+                F.v[idg] =  F.v[idm];
+                F.w[idg] =  F.w[idm];
+                F.p[idg] =  F.p[idm];
             }
-        } else if (bc_xmin == LocalDesc::BCType::Outflow) {
+        } else if (P.bc_xmin == SolverParams::BCType::Outflow) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<ng;++i) {
                 int idg = F.I(i,j,k);
                 int idi = F.I(ng,j,k);  // 最近的内层
                 F.rho[idg]  = F.rho[idi];
-                F.rhou[idg] = F.rhou[idi];
-                F.rhov[idg] = F.rhov[idi];
-                F.rhow[idg] = F.rhow[idi];
-                F.E[idg]    = F.E[idi];
+                F.u[idg] = F.u[idi];
+                F.v[idg] = F.v[idi];
+                F.w[idg] = F.w[idi];
+                F.p[idg] = F.p[idi];
             }
         }
     }
     if (L.nbr_xp == MPI_PROC_NULL) {
-        if (bc_xmax == LocalDesc::BCType::Wall || bc_xmax == LocalDesc::BCType::Symmetry) {
+        if (P.bc_xmax == SolverParams::BCType::Wall || P.bc_xmax == SolverParams::BCType::Symmetry) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=sx-ng;i<sx;++i) {
@@ -72,7 +73,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
                 F.E[idg]    =  F.E[idm];
             }
         }
-        else if (bc_xmax == LocalDesc::BCType::Outflow) {
+        else if (P.bc_xmax == SolverParams::BCType::Outflow) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=sx-ng;i<sx;++i) {
@@ -89,7 +90,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
 
     // ---- YMIN / YMAX ----
     if (L.nbr_ym == MPI_PROC_NULL) {
-        if (bc_ymin == LocalDesc::BCType::Wall || bc_ymin == LocalDesc::BCType::Symmetry) {
+        if (P.bc_ymin == SolverParams::BCType::Wall || P.bc_ymin == SolverParams::BCType::Symmetry) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<ng;++j)
             for (int i=0;i<sx;++i) {
@@ -103,7 +104,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
                 F.E[idg]    =  F.E[idm];
             }
         }
-        else if (bc_ymin == LocalDesc::BCType::Outflow) {
+        else if (P.bc_ymin == SolverParams::BCType::Outflow) {
             for (int k=0;k<sz;++k)
             for (int j=0;j<ng;++j)
             for (int i=0;i<sx;++i) {
@@ -118,7 +119,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
         }
     }
     if (L.nbr_yp == MPI_PROC_NULL) {
-        if (bc_ymax == LocalDesc::BCType::Wall || bc_ymax == LocalDesc::BCType::Symmetry) {
+        if (P.bc_ymax == SolverParams::BCType::Wall || P.bc_ymax == SolverParams::BCType::Symmetry) {
             for (int k=0;k<sz;++k)
             for (int j=sy-ng;j<sy;++j)
             for (int i=0;i<sx;++i) {
@@ -132,7 +133,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
                 F.E[idg]    =  F.E[idm];
             }
         }
-        else if (bc_ymax == LocalDesc::BCType::Outflow) {
+        else if (P.bc_ymax == SolverParams::BCType::Outflow) {
             for (int k=0;k<sz;++k)
             for (int j=sy-ng;j<sy;++j)
             for (int i=0;i<sx;++i) {
@@ -149,7 +150,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
 
     // ---- ZMIN / ZMAX ----
     if (L.nbr_zm == MPI_PROC_NULL) {
-        if (bc_zmin == LocalDesc::BCType::Wall || bc_zmin == LocalDesc::BCType::Symmetry) {
+        if (P.bc_zmin == SolverParams::BCType::Wall || P.bc_zmin == SolverParams::BCType::Symmetry) {
             for (int k=0;k<ng;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<sx;++i) {
@@ -163,7 +164,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
                 F.E[idg]    =  F.E[idm];
             }
         }
-        else if (bc_zmin == LocalDesc::BCType::Outflow) {
+        else if (P.bc_zmin == SolverParams::BCType::Outflow) {
             for (int k=0;k<ng;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<sx;++i) {
@@ -178,7 +179,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
         }
     }
     if (L.nbr_zp == MPI_PROC_NULL) {
-        if (bc_zmax == LocalDesc::BCType::Wall || bc_zmax == LocalDesc::BCType::Symmetry) {
+        if (P.bc_zmax == SolverParams::BCType::Wall || P.bc_zmax == SolverParams::BCType::Symmetry) {
             for (int k=sz-ng;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<sx;++i) {
@@ -192,7 +193,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, SolverParams &P)
                 F.E[idg]    =  F.E[idm];
             }
         }
-        else if (bc_zmax == LocalDesc::BCType::Outflow) {
+        else if (P.bc_zmax == SolverParams::BCType::Outflow) {
             for (int k=sz-ng;k<sz;++k)
             for (int j=0;j<sy;++j)
             for (int i=0;i<sx;++i) {

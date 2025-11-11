@@ -8,7 +8,7 @@
 #include <string>
 
 // 初始化求解参数
-void initialize_SolverParams(SolverParams &P, CartDecomp &C);
+void initialize_SolverParams(SolverParams &P, CartDecomp &C, GridDesc &G);
 
 // 初始化流场
 // 均匀场
@@ -18,7 +18,7 @@ void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams 
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 边界条件处理函数
-void apply_boundary_conditions(Field3D &F, const GridDesc &G, const SolverParams &P);
+void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);
 
 /// 基础欧拉通量函数
 inline void flux_euler(double rho, double u, double v, double w,
@@ -31,7 +31,10 @@ inline double sound_speed(double gamma, double p, double rho);
 void rusanov_flux(const double *QL, const double *QR, double gamma, double *Fhat);
 
 // 简单的线性重构（标量，5 点模板）
-double linear_reconstruction(const std::array<double,5> &stencil);
+double linear_reconstruction(const std::array<double,2> &stencil);
+
+// MDCD 重构（标量，6 点模板）
+double mdcd_reconstruction(const std::array<double,6>& stencil, SolverParams P);
 
 // WENO5 重构（标量，5 点模板）
 double weno5_reconstruction(const std::array<double,5> &stencil);
@@ -43,7 +46,7 @@ double c6th_reconstruction(const std::array<double,6> &stencil);
 double c4th_reconstruction(const std::array<double,4>& stencil);
 
 // Runtime-sized reconstruction selector (accepts std::vector stencil)
-double reconstruct_select(const std::vector<double> &stencil, double flag, const SolverParams::Reconstruction &r);
+double reconstruct_select(const std::vector<double> &stencil, double flag, const SolverParams P);
 
 // RHS 计算占位符函数（用户需在此定义具体的通量差分或高阶算子）
 void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs);
@@ -105,6 +108,5 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 void compute_diagnostics(Field3D &F, const SolverParams &P);
 
 // main time advance loop with monitor & output
-void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs, 
-                  int max_steps, int monitor_freq, int output_freq, double TotalTime);
+void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs);
 

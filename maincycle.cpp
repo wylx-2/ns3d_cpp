@@ -8,12 +8,15 @@
 // -----------------------------------------------------------------------------
 // 主时间推进循环 with monitor & output
 // -----------------------------------------------------------------------------
-void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs, 
-                  int max_steps, int monitor_freq, int output_freq, double TotalTime)
+void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs)
 {
     double t_start = MPI_Wtime();
     double t_last = t_start;
     double current_time = 0.0;
+    int max_steps = P.max_steps;
+    int monitor_freq = P.monitor_freq;
+    int output_freq = P.output_freq;
+    double TotalTime = P.TotalTime;
 
     for (int step = 1; step <= max_steps; ++step)
     {
