@@ -48,22 +48,6 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
         return mdcd_reconstruction(a5, P);
     }
 
-    if (r == SolverParams::Reconstruction::C6th) {
-        require_size(6, "C6th");
-        std::array<double,6> a6;
-        for (int i = 0; i < 6; ++i) a6[i] = vstencil[i];
-        if (flag < 0.0) std::reverse(a6.begin(), a6.end());
-        return c6th_reconstruction(a6);
-    }
-
-    if (r == SolverParams::Reconstruction::C4th) {
-        require_size(4, "C4th");
-        std::array<double,4> a4;
-        for (int i = 0; i < 4; ++i) a4[i] = vstencil[i];
-        if (flag < 0.0) std::reverse(a4.begin(), a4.end());
-        return c4th_reconstruction(a4);
-    }
-
     // fallback for unknown enum values or other cases: do a small
     // centered/biased average if the stencil is at least length 2.
     if (n >= 2) {

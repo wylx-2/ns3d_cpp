@@ -40,7 +40,7 @@ struct CartDecomp {
     int size = 1;
     int dims[3] = {1,1,1};   // px,py,pz
     int coords[3] = {0,0,0}; // coordinate of this rank
-    int periods[3] = {0,0,0};// should be defined after SolverParams
+    int periods[3] = {0,0,0};// always non-periodic by default
 };
 
 // Local description per MPI rank. nx,ny,nz are local physical cells (without ghosts)
@@ -99,11 +99,13 @@ struct SolverParams {
         WENO5,     // stencil-based WENO5
         LINEAR,    // simple linear reconstruction
         MDCD,      // Minimum Dissipation controlled dispersion
+    };
+    enum class ViscousScheme {
         C6th,      // Sixth-order central difference
         C4th       // Fourth-order central difference
     };
     Reconstruction recon = Reconstruction::MDCD;
-    Reconstruction recon_vis = Reconstruction::C6th;
+    ViscousScheme vis_scheme = ViscousScheme::C6th;
     double mdcd_diss = 0.01;  // MDCD dissipation coefficient
     double mdcd_disp = 0.0463783;  // MDCD dispersion coefficient
 
@@ -114,7 +116,7 @@ struct SolverParams {
     bool char_recon = true;
 
     // boundary types at each side (if neighbor is MPI_PROC_NULL)
-    enum class BCType { Periodic, Wall, Symmetry, Outflow };
+    enum class BCType { Periodic, Wall, Symmetry, Outflow, Inflow };
     BCType bc_xmin = BCType::Periodic;
     BCType bc_xmax = BCType::Periodic;
     BCType bc_ymin = BCType::Periodic;

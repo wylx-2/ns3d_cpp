@@ -20,6 +20,13 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 // 边界条件处理函数
 void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);
 
+// 边界条件具体实现函数
+void apply_wall_bc(Field3D &F, const LocalDesc &L, int face_id);
+void apply_symmetry_bc(Field3D &F, const LocalDesc &L, int face_id);
+void apply_outflow_bc(Field3D &F, const LocalDesc &L, int face_id);
+void apply_inflow_bc(Field3D &F, const LocalDesc &L, int face_id);
+void apply_periodic_bc(Field3D &F, const LocalDesc &L, const CartDecomp &C, int face);
+
 /// 基础欧拉通量函数
 inline void flux_euler(double rho, double u, double v, double w,
                 double p, double E, double F[5]);
@@ -87,13 +94,13 @@ static void build_eigen_matrices(const double Ul[5], const double Ur[5],
                                  double lambar[5]);
 
 // 计算空间导数
-void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P);
+void compute_gradients(Field3D &F, const GridDesc &G);
 
 // 计算粘性通量
 void compute_viscous_flux(Field3D &F, const SolverParams &P);
 
-// 重构粘性通量
-void reconstructViscidFlux(Field3D &F, const SolverParams &P);
+// 计算粘性通量导数
+void compute_vis_flux(Field3D &F, const GridDesc &G);
 
 // Output full field in Tecplot ASCII format (per-rank file). Prefix will be used for filename: <prefix>_rank<id>.dat
 // time: physical time to label the output (optional, default 0.0)

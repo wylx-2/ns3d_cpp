@@ -14,7 +14,7 @@ void initialize_SolverParams(SolverParams &P, CartDecomp &C, GridDesc &G)
     P.use_periodic = false;
     P.fvs_type = SolverParams::FVS_Type::StegerWarming;
     P.recon = SolverParams::Reconstruction::MDCD;
-    P.recon_vis = SolverParams::Reconstruction::C6th;
+    P.vis_scheme = SolverParams::ViscousScheme::C6th;
     P.stencil = 6;
     P.ghost_layers = 3;
     P.char_recon = true;
@@ -32,33 +32,6 @@ void initialize_SolverParams(SolverParams &P, CartDecomp &C, GridDesc &G)
     int sizes; MPI_Comm_size(MPI_COMM_WORLD, &sizes);C.size = sizes;
     int rank_num; MPI_Comm_rank(MPI_COMM_WORLD, &rank_num);C.rank = rank_num;
     MPI_Dims_create(sizes, 3, C.dims);
-    if(P.bc_xmax == SolverParams::BCType::Periodic)
-    {
-        // check if bc_xmin/xmax are both periodic
-        if(P.bc_xmin != SolverParams::BCType::Periodic) {
-            std::cerr << "Error: Inconsistent periodic BCs in x-direction!" << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, -1); 
-        }
-        C.periods[0] = 1;
-    }
-    if(P.bc_ymax == SolverParams::BCType::Periodic)
-    {
-        // check if bc_ymin/ymax are both periodic
-        if(P.bc_ymin != SolverParams::BCType::Periodic) {
-            std::cerr << "Error: Inconsistent periodic BCs in y-direction!" << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, -1); 
-        }
-        C.periods[1] = 1;
-    }
-    if(P.bc_zmax == SolverParams::BCType::Periodic)
-    {
-        // check if bc_zmin/zmax are both periodic
-        if(P.bc_zmin != SolverParams::BCType::Periodic) {
-            std::cerr << "Error: Inconsistent periodic BCs in z-direction!" << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, -1);
-        }
-        C.periods[2] = 1;
-    }
 
     G.global_nx = 16; G.global_ny = 16; G.global_nz = 16;
     G.x0 = 0.0; G.y0 = 0.0; G.z0 = 0.0;

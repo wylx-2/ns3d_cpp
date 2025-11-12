@@ -26,13 +26,15 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     computeFVSFluxes(F, P);
 
     // 计算空间导数
-    compute_gradients(F, G, P);
+    compute_gradients(F, G);
     // 同步不同进程的ghost区域空间导数
-    exchange_halos_gradients(F, C, L, out_reqs); //还需要额外边界处理！
+    // exchange_halos_gradients(F, C, L, out_reqs); //还需要额外边界处理！
     // 计算粘性通量
     compute_viscous_flux(F, P);
-    // 重构粘性通量
-    reconstructViscidFlux(F, P);
+    // 应该在这里交换粘性通量的halo区域，并处理周期边界
+
+    // 粘性通量的导数
+    compute_vis_flux(F, G);
 
     // 使用面通量计算 RHS（有限体积散度），只对物理单元计算
     // dQ/dt = - [ (F_x(i+1/2)-F_x(i-1/2))/dx + (F_y(j+1/2)-F_y(j-1/2))/dy + (F_z(k+1/2)-F_z(k-1/2))/dz ]
