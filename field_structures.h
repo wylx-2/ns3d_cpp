@@ -38,7 +38,7 @@ struct CartDecomp {
     MPI_Comm cart_comm = MPI_COMM_NULL;
     int rank = 0;
     int size = 1;
-    int dims[3] = {1,1,1};   // px,py,pz
+    int dims[3] = {0,0,0};   // px,py,pz
     int coords[3] = {0,0,0}; // coordinate of this rank
     int periods[3] = {0,0,0};// always non-periodic by default
 };
@@ -85,7 +85,7 @@ struct SolverParams {
     double mu = 1.0e-3;      // dynamic viscosity
     double Pr = 0.71;        // Prandtl number
     double Rgas = 287.058;   // specific gas constant (J/kg/K), optional
-    double cfl = 0.5;
+    double cfl = 0.1;
     bool use_periodic = false; // convenience
     // Flux Vector Splitting (FVS) selection
     enum class FVS_Type {
@@ -97,6 +97,7 @@ struct SolverParams {
     // Reconstruction selection for face reconstruction routines
     enum class Reconstruction {
         WENO5,     // stencil-based WENO5
+        WCNS,      // Weighted Compact Nonlinear Scheme
         LINEAR,    // simple linear reconstruction
         MDCD,      // Minimum Dissipation controlled dispersion
     };
@@ -104,7 +105,7 @@ struct SolverParams {
         C6th,      // Sixth-order central difference
         C4th       // Fourth-order central difference
     };
-    Reconstruction recon = Reconstruction::MDCD;
+    Reconstruction recon = Reconstruction::WENO5;
     ViscousScheme vis_scheme = ViscousScheme::C6th;
     double mdcd_diss = 0.01;  // MDCD dissipation coefficient
     double mdcd_disp = 0.0463783;  // MDCD dispersion coefficient
@@ -113,7 +114,7 @@ struct SolverParams {
     int stencil = 6;
     int ghost_layers = 3;
     // characteristic-wise or component-wise reconstruction
-    bool char_recon = true;
+    bool char_recon = false;
 
     // boundary types at each side (if neighbor is MPI_PROC_NULL)
     enum class BCType { Periodic, Wall, Symmetry, Outflow, Inflow };
@@ -125,10 +126,10 @@ struct SolverParams {
     BCType bc_zmax = BCType::Periodic;
 
     // simulation control
-    int max_steps = 1000;
-    int monitor_freq = 100;
-    int output_freq = 200;
-    double TotalTime = 10.0;
+    int max_steps = 5;
+    int monitor_freq = 1;
+    int output_freq = 1;
+    double TotalTime = 1.0;
 };
 
 // --------------------------- Halo exchange requests --------------------------
@@ -821,8 +822,31 @@ inline void exchange_halos_physical(Field3D &F, CartDecomp &C, LocalDesc &L, Hal
 
 // Build a Cartesian communicator and fill CartDecomp
 inline void build_cart_decomp(CartDecomp &C) {
+    int world_size = 1, world_rank = 0;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    C.size = world_size;
+    C.rank = world_rank;
+
+    // Ensure dims are zeroed so MPI_Dims_create will compute a valid decomposition
+    C.dims[0] = C.dims[1] = C.dims[2] = 0;
+    MPI_Dims_create(world_size, 3, C.dims);
+
+    // Create Cartesian communicator; if it fails fall back to duplicating WORLD
     MPI_Cart_create(MPI_COMM_WORLD, 3, C.dims, C.periods, /*reorder=*/0, &C.cart_comm);
-    MPI_Cart_coords(C.cart_comm, C.rank, 3, C.coords);
+    if (C.cart_comm == MPI_COMM_NULL) {
+        MPI_Comm_dup(MPI_COMM_WORLD, &C.cart_comm);
+        C.coords[0] = C.coords[1] = C.coords[2] = 0;
+    } else {
+        MPI_Comm_rank(C.cart_comm, &C.rank);
+        MPI_Comm_size(C.cart_comm, &C.size);
+        MPI_Cart_coords(C.cart_comm, C.rank, 3, C.coords);
+    }
+
+    if (C.rank == 0) {
+        std::cout << "MPI Cartesian Decomposition: periods = [" << C.periods[0] << ", " << C.periods[1] << ", " << C.periods[2] << "]" << std::endl;
+        std::cout << " dim = [" << C.dims[0] << ", " << C.dims[1] << ", " << C.dims[2] << "]" << std::endl;
+    }
 }
 
 // Compute local sizes and neighbor ranks and set into LocalDesc L

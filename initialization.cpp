@@ -1,79 +1,189 @@
 #include "field_structures.h"
+#include "ns3d_func.h"
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
+#include <algorithm>
 
-void initialize_SolverParams(SolverParams &P, CartDecomp &C, GridDesc &G)
+// 去掉字符串两端空格
+static inline std::string trim(const std::string& s)
 {
-    // Default parameters are already set in the struct definition
-    // Modify any parameters here if needed
-    P.gamma = 1.4;
-    P.mu = 1.0e-3;
-    P.Pr = 0.71;
-    P.Rgas = 287.058;
-    P.cfl = 0.5;
-    P.use_periodic = false;
-    P.fvs_type = SolverParams::FVS_Type::StegerWarming;
-    P.recon = SolverParams::Reconstruction::MDCD;
-    P.vis_scheme = SolverParams::ViscousScheme::C6th;
-    P.stencil = 6;
-    P.ghost_layers = 3;
-    P.char_recon = true;
+    size_t a = s.find_first_not_of(" \t\r\n");
+    size_t b = s.find_last_not_of(" \t\r\n");
+    if (a == std::string::npos) return "";
+    return s.substr(a, b - a + 1);
+}
 
-    // Set boundary conditions (can be modified as needed)
-    P.bc_xmin = SolverParams::BCType::Periodic;
-    P.bc_xmax = SolverParams::BCType::Periodic;
-    P.bc_ymin = SolverParams::BCType::Periodic;
-    P.bc_ymax = SolverParams::BCType::Periodic;
-    P.bc_zmin = SolverParams::BCType::Periodic;
-    P.bc_zmax = SolverParams::BCType::Periodic;
+// 字符串转小写
+static inline std::string lower(const std::string &s)
+{
+    std::string r=s;
+    std::transform(r.begin(), r.end(), r.begin(), ::tolower);
+    return r;
+}
 
-    // Parameter settings can be modified here if needed
-    // use MPI_Dims_create to choose a good px,py,pz
-    int sizes; MPI_Comm_size(MPI_COMM_WORLD, &sizes);C.size = sizes;
-    int rank_num; MPI_Comm_rank(MPI_COMM_WORLD, &rank_num);C.rank = rank_num;
-    MPI_Dims_create(sizes, 3, C.dims);
+bool read_solver_params_from_file(
+        const std::string &fname,
+        SolverParams &P,
+        GridDesc &G,
+        CartDecomp &C)
+{
+    std::ifstream fin(fname);
+    if (!fin.is_open()) {
+        std::cerr << "Error: cannot open solver parameter file: " << fname << "\n";
+        return false;
+    }
 
+    // ---- 默认值 ----
+    P = SolverParams();  // 使用结构体默认构造
+    // 网格默认值
     G.global_nx = 16; G.global_ny = 16; G.global_nz = 16;
-    G.x0 = 0.0; G.y0 = 0.0; G.z0 = 0.0;
+    G.x0=G.y0=G.z0=0.0;
+
+    std::string line;
+    while (std::getline(fin, line))
+    {
+        line = trim(line);
+        if (line.empty() || line[0]=='#') continue;
+
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+
+        std::string key = trim(line.substr(0,eq));
+        std::string val = trim(line.substr(eq+1));
+
+        std::string k = lower(key);
+        std::string v = lower(val);
+
+        // ---- 物理参数 ----
+        if (k=="gamma") P.gamma = std::stod(val);
+        else if (k=="mu") P.mu = std::stod(val);
+        else if (k=="pr") P.Pr = std::stod(val);
+        else if (k=="rgas") P.Rgas = std::stod(val);
+
+        // ---- 时间推进 ----
+        else if (k=="cfl") P.cfl = std::stod(val);
+
+        // ---- 重构设置 ----
+        else if (k=="fvs_type") {
+            if (v=="stegerwarming") P.fvs_type = SolverParams::FVS_Type::StegerWarming;
+            else if (v=="vanleer") P.fvs_type = SolverParams::FVS_Type::VanLeer;
+            else if (v=="laxfriedrichs") P.fvs_type = SolverParams::FVS_Type::LaxFriedrichs;
+        }
+        else if (k=="recon") {
+            if (v=="mdcd") P.recon = SolverParams::Reconstruction::MDCD;
+            else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
+            else if (v=="wcns") P.recon = SolverParams::Reconstruction::WCNS;
+            else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
+        }
+        else if (k=="vis_scheme") {
+            if (v=="c4") P.vis_scheme = SolverParams::ViscousScheme::C4th;
+            else if (v=="c6") P.vis_scheme = SolverParams::ViscousScheme::C6th;
+        }
+        else if (k=="char_recon") {
+            P.char_recon = (v=="yes" || v=="true");
+        }
+        else if (k=="stencil") P.stencil = std::stoi(val);
+        
+        else if (k=="mdcd_diss") P.mdcd_diss = std::stod(val);
+        else if (k=="mdcd_disp") P.mdcd_disp = std::stod(val);
+
+        // ---- 网格 ----
+        else if (k=="global_nx") G.global_nx = std::stoi(val);
+        else if (k=="global_ny") G.global_ny = std::stoi(val);
+        else if (k=="global_nz") G.global_nz = std::stoi(val);
+
+        else if (k=="x0") G.x0 = std::stod(val);
+        else if (k=="y0") G.y0 = std::stod(val);
+        else if (k=="z0") G.z0 = std::stod(val);
+
+        else if (k=="ghost_layers") P.ghost_layers = std::stoi(val);
+
+        // ---- 边界条件 ----
+        auto parse_bc = [&](const std::string &v) {
+            if (v=="inflow") return SolverParams::BCType::Inflow;
+            if (v=="wall")     return SolverParams::BCType::Wall;
+            if (v=="symmetry") return SolverParams::BCType::Symmetry;
+            if (v=="outflow")  return SolverParams::BCType::Outflow;
+            return SolverParams::BCType::Periodic;
+        };
+
+        if (k=="bc_xmin") P.bc_xmin = parse_bc(v);
+        else if (k=="bc_xmax") P.bc_xmax = parse_bc(v);
+        else if (k=="bc_ymin") P.bc_ymin = parse_bc(v);
+        else if (k=="bc_ymax") P.bc_ymax = parse_bc(v);
+        else if (k=="bc_zmin") P.bc_zmin = parse_bc(v);
+        else if (k=="bc_zmax") P.bc_zmax = parse_bc(v);
+    }
+
+    fin.close();
+
+    // -------------------------------
+    // 后处理：设置周期性标志
+    // -------------------------------
+    if (P.bc_xmin==SolverParams::BCType::Periodic &&
+        P.bc_xmax==SolverParams::BCType::Periodic)
+        C.periods[0] = 1;
+    if (P.bc_ymin==SolverParams::BCType::Periodic &&
+        P.bc_ymax==SolverParams::BCType::Periodic)
+        C.periods[1] = 1;
+    if (P.bc_zmin==SolverParams::BCType::Periodic &&
+        P.bc_zmax==SolverParams::BCType::Periodic)
+        C.periods[2] = 1;
     G.dx = 1.0 / G.global_nx;
     G.dy = 1.0 / G.global_ny;
     G.dz = 1.0 / G.global_nz;
+
+    return true;
 }
 
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const double gamma = P.gamma;
-    const double x_mid = 0.5, y_mid = 0.5;
 
-    for (int k = 0; k < L.sz; ++k) {
-        double z = (L.oz + k - L.ngz + 0.5) * G.dz;
-        if (z > G.dz * 1.5) continue;  // 2D test plane only (optional)
+    const double x_mid = 0.5;
+    const double y_mid = 0.5;
 
-        for (int j = 0; j < L.sy; ++j) {
+    // ----- 遍历整个局部网格，包括所有 z 层 -----
+    for (int k = 0; k < L.sz; ++k)
+    {
+        // z 不参与计算，只做复制
+        for (int j = 0; j < L.sy; ++j)
+        {
             double y = (L.oy + j - L.ngy + 0.5) * G.dy;
-            for (int i = 0; i < L.sx; ++i) {
+
+            for (int i = 0; i < L.sx; ++i)
+            {
                 double x = (L.ox + i - L.ngx + 0.5) * G.dx;
 
                 double rho, u, v, w, p;
                 w = 0.0;
 
-                // Select quadrant
-                if (x >= x_mid && y >= y_mid) {          // Region I
-                    rho = 1.0; u = 0.0; v = 0.0; p = 1.0;
-                } else if (x < x_mid && y >= y_mid) {    // Region II
-                    rho = 0.5197; u = -0.7259; v = 0.0; p = 0.4;
-                } else if (x < x_mid && y < y_mid) {     // Region III
-                    rho = 0.1072; u = -0.7259; v = -0.7259; p = 0.0439;
-                } else {                                 // Region IV
-                    rho = 0.2579; u = 0.0; v = -0.7259; p = 0.15;
+                // ========= 四象限 Riemann ===============
+                if (x >= x_mid && y >= y_mid) {          // 区域 I
+                    rho = 1.0;     u = 0.0;     v = 0.0;     p = 1.0;
                 }
+                else if (x < x_mid && y >= y_mid) {      // 区域 II
+                    rho = 0.5197;  u = -0.7259; v = 0.0;     p = 0.4;
+                }
+                else if (x < x_mid && y < y_mid) {       // 区域 III
+                    rho = 0.1072;  u = -0.7259; v = -0.7259; p = 0.0439;
+                }
+                else {                                   // 区域 IV
+                    rho = 0.2579;  u = 0.0;     v = -0.7259; p = 0.15;
+                }
+
+                // ========= 写入数据 =========
                 int id = F.I(i,j,k);
-                F.rho[id]  = rho;
-                F.p[id]    = p;
-                F.u[id]    = u;
-                F.v[id]    = v;
-                F.w[id]    = w;
+
+                F.rho[id] = rho;
+                F.u[id]   = u;
+                F.v[id]   = v;
+                F.w[id]   = w;
+                F.p[id]   = p;
             }
         }
     }

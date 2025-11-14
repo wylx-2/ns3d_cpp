@@ -1,0 +1,44 @@
+# ============================
+# Solver Parameter File
+# ============================
+
+# Physical parameters
+gamma       = 1.4
+mu          = 1.0e-3
+Pr          = 0.71
+Rgas        = 287.058
+
+# Time stepping
+cfl         = 0.1
+
+# Reconstruction and schemes
+fvs_type    = StegerWarming      # {StegerWarming, VanLeer, LaxFriedrichs}
+recon       = MDCD               # {WENO5, WCNS, MDCD, Linear}
+vis_scheme  = C6th               # {C2, C4, C6, C8}
+char_recon  = no
+stencil     = 6
+
+# MDCD Parameter
+mdcd_disp = 0.0463783
+mdcd_diss = 0.01
+
+# Grid
+global_nx   = 16
+global_ny   = 16
+global_nz   = 2
+
+# Ghost layers
+ghost_layers = 3
+
+# Boundary conditions
+bc_xmin = Outflow
+bc_xmax = Outflow
+bc_ymin = Outflow
+bc_ymax = Outflow
+bc_zmin = Outflow
+bc_zmax = Outflow
+
+# Optional domain origin
+x0 = 0.0
+y0 = 0.0
+z0 = 0.0

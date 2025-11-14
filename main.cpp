@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     SolverParams P;
     GridDesc G; 
     // initialize SolverParams
-    initialize_SolverParams(P, C, G);
+    read_solver_params_from_file("solver.in", P, G, C);
     build_cart_decomp(C);
 
     LocalDesc L; 
@@ -22,6 +22,8 @@ int main(int argc, char** argv) {
     Field3D F; 
     F.allocate(L);
     initialize_uniform_field(F, G, P);  // Initialize field
+    //initialize_riemann_2d(F, G, P);
+
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange
     F.primitiveToConserved(P); // update primitive variables (including ghosts)
     if (C.rank == 0) std::cout << "Initialization + halo exchange done\n";

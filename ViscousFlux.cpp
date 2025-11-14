@@ -26,16 +26,16 @@ inline double diff_6th_central(const std::vector<double> &f, int i, double dx) {
     return (-f[i+3] + 9.0*f[i+2] - 45.0*f[i+1] + 45.0*f[i-1] - 9.0*f[i-2] + f[i-3]) / (60.0*dx);
 }
 
-inline auto choose_scheme = [&](int idx, int nstart, int nend, bool periodic) -> int
+inline int choose_scheme(int idx, int nstart, int nend, bool periodic)
 {
     if (periodic)
         return 6; // always use 6th order for periodic
     int dist_left = idx - nstart;
     if (dist_left == 0)
-        return 1; // forward 2nd order for left boundary
+        return 1; // forward 2nd order for left boundary (flag == +1)
     int dist_right = (nend - 1) - idx;
     if (dist_right == 0)
-        return -1; // backward 2nd order for right boundary
+        return -1; // backward 2nd order for right boundary (flag == -1)
     int dmin = std::min(dist_left, dist_right);
     if (dmin == 1)
         return 2; // 2nd order central for sub-boundary points
@@ -43,50 +43,43 @@ inline auto choose_scheme = [&](int idx, int nstart, int nend, bool periodic) ->
         return 4; // 4th order central for sub-sub-boundary points
     else
         return 6; // 6th order central for inner points
-};
+}
 
-inline auto diff_x = [&](const std::vector<double> &f, int i, double dx, int order_x)
+inline double diff_x(const std::vector<double> &f, int i, double dx, int order_x)
 {
-    switch (order_x)
-    {
-    case 0:
+    if (order_x == 1 || order_x == -1)
         return diff_2nd_forward(f, i, dx, order_x);
-    case 2:
+    else if (order_x == 2)
         return diff_2nd_central(f, i, dx);
-    case 4:
+    else if (order_x == 4)
         return diff_4th_central(f, i, dx);
-    default:
+    else
         return diff_6th_central(f, i, dx);
-    }
-};
-inline auto diff_y = [&](const std::vector<double> &f, int j, double dy, int order_y)
+}
+
+inline double diff_y(const std::vector<double> &f, int j, double dy, int order_y)
 {
-    switch (order_y)
-    {
-    case 0:
+    if (order_y == 1 || order_y == -1)
         return diff_2nd_forward(f, j, dy, order_y);
-    case 2:
+    else if (order_y == 2)
         return diff_2nd_central(f, j, dy);
-    case 4:
+    else if (order_y == 4)
         return diff_4th_central(f, j, dy);
-    default:
+    else
         return diff_6th_central(f, j, dy);
-    }
-};
-inline auto diff_z = [&](const std::vector<double> &f, int k, double dz, int order_z)
+}
+
+inline double diff_z(const std::vector<double> &f, int k, double dz, int order_z)
 {
-    switch (order_z)
-    {
-    case 0:
+    if (order_z == 1 || order_z == -1)
         return diff_2nd_forward(f, k, dz, order_z);
-    case 2:
+    else if (order_z == 2)
         return diff_2nd_central(f, k, dz);
-    case 4:
+    else if (order_z == 4)
         return diff_4th_central(f, k, dz);
-    default:
+    else
         return diff_6th_central(f, k, dz);
-    }
-};
+}
 // ==================================================
 // 主函数：自适应阶数梯度计算, 根据边界距离选择差分格式
 // 计算内点的6阶中心差分，边界处根据距离选择低阶格式

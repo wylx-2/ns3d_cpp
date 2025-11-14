@@ -1,4 +1,5 @@
 #include "field_structures.h"
+#include "ns3d_func.h"
 #include <mpi.h>
 #include <algorithm>
 #include <iostream>
@@ -43,8 +44,7 @@ void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C,
                 apply_inflow_bc(F, L, d.id);
                 break;
             case SolverParams::BCType::Periodic:
-                // 周期边界与MPI通信处理分开处理，传输内点值而非边界值
-                apply_periodic_bc(F, L, C, d.id);
+                // 周期边界已由通信处理，无需额外操作
                 break;
         }
     }
@@ -153,6 +153,7 @@ void apply_outflow_bc(Field3D &F, const LocalDesc &L, int face)
         F.p[id1]=F.p[id2];
     };
 
+    // copy boundary values from interior
     if (face==XMIN) for(int k=0;k<sz;++k)for(int j=0;j<sy;++j)for(int i=0;i<ng;++i)
         copy(i,j,k,ng,j,k);
     if (face==XMAX) for(int k=0;k<sz;++k)for(int j=0;j<sy;++j)for(int i=sx-ng;i<sx;++i)
@@ -188,109 +189,4 @@ void apply_inflow_bc(Field3D &F, const LocalDesc &L, int face)
     if (face==YMAX) for(int k=0;k<sz;++k)for(int j=sy-ng;j<sy;++j)for(int i=0;i<sx;++i) fill(i,j,k);
     if (face==ZMIN) for(int k=0;k<ng;++k)for(int j=0;j<sy;++j)for(int i=0;i<sx;++i) fill(i,j,k);
     if (face==ZMAX) for(int k=sz-ng;k<sz;++k)for(int j=0;j<sy;++j)for(int i=0;i<sx;++i) fill(i,j,k);
-}
-
-// -----------------------------------------
-// Periodic boundary condition implementation
-// -----------------------------------------
-void apply_periodic_bc(Field3D &F, const LocalDesc &L, const CartDecomp &C, int face)
-{
-    const int ngx=L.ngx, ngy=L.ngy, ngz=L.ngz;
-    const int nx=L.nx, ny=L.ny, nz=L.nz;
-    const int sx=L.sx, sy=L.sy, sz=L.sz;
-    const int tag_base = 400 + face * 10;
-
-    // --- 选择方向 ---
-    int main_dir = face / 2;   // 0:x, 1:y, 2:z
-    bool is_max  = (face % 2 == 1);
-
-    // --- 对应邻居进程 ---
-    int nbr_send, nbr_recv;
-    if (main_dir == 0) {
-        nbr_send = is_max ? L.nbr_xp : L.nbr_xm;
-    } else if (main_dir == 1) {
-        nbr_send = is_max ? L.nbr_yp : L.nbr_ym;
-    } else {
-        nbr_send = is_max ? L.nbr_zp : L.nbr_zm;
-    }
-    nbr_recv = nbr_send; // 周期边界发送和接收进程相同
-
-    // --- 通信尺寸 ---
-    int ghost = (main_dir == 0) ? ngx : (main_dir == 1 ? ngy : ngz);
-    int n1 = (main_dir == 0) ? ny : (main_dir == 1 ? nx : nx);
-    int n2 = (main_dir == 0) ? nz : (main_dir == 1 ? nz : ny);
-    int nvar = 5; // rho,u,v,w,p
-
-    int buf_size = ghost * n1 * n2 * nvar;
-    std::vector<double> sendbuf(buf_size), recvbuf(buf_size);
-
-    // --- 打包函数 ---
-    auto pack = [&](bool max_side) {
-        int p = 0;
-        for (int kk = 0; kk < n2; ++kk)
-        for (int jj = 0; jj < n1; ++jj)
-        for (int ii = 0; ii < ghost; ++ii)
-        {
-            int i,j,k;
-            if (main_dir == 0) { // X
-                i = (max_side ? ngx+nx-ghost+ii-1 : ngx+ii+1); // 修改处，即不传输边界点
-                j = ngy + jj;
-                k = ngz + kk;
-            } else if (main_dir == 1) { // Y
-                i = ngx + jj;
-                j = (max_side ? ngy+ny-ghost+ii-1 : ngy+ii+1);
-                k = ngz + kk;
-            } else { // Z
-                i = ngx + jj;
-                j = ngy + kk;
-                k = (max_side ? ngz+nz-ghost+ii-1 : ngz+ii+1);
-            }
-            int id = F.I(i,j,k);
-            sendbuf[p++] = F.rho[id];
-            sendbuf[p++] = F.u[id];
-            sendbuf[p++] = F.v[id];
-            sendbuf[p++] = F.w[id];
-            sendbuf[p++] = F.p[id];
-        }
-        assert(p == buf_size);
-    };
-
-    // --- 解包函数 ---
-    auto unpack = [&](bool max_side) {
-        int p = 0;
-        for (int kk = 0; kk < n2; ++kk)
-        for (int jj = 0; jj < n1; ++jj)
-        for (int ii = 0; ii < ghost; ++ii)
-        {
-            int i,j,k;
-            if (main_dir == 0) {
-                i = (max_side ? ngx+nx+ii : ii);
-                j = ngy + jj;
-                k = ngz + kk;
-            } else if (main_dir == 1) {
-                i = ngx + jj;
-                j = (max_side ? ngy+ny+ii : ii);
-                k = ngz + kk;
-            } else {
-                i = ngx + jj;
-                j = ngy + kk;
-                k = (max_side ? ngz+nz+ii : ii);
-            }
-            int id = F.I(i,j,k);
-            F.rho[id] = recvbuf[p++];
-            F.u[id]   = recvbuf[p++];
-            F.v[id]   = recvbuf[p++];
-            F.w[id]   = recvbuf[p++];
-            F.p[id]   = recvbuf[p++];
-        }
-        assert(p == buf_size);
-    };
-
-    // --- 通信流程 ---
-    pack(is_max);
-    MPI_Request reqs[2];
-    MPI_Irecv(recvbuf.data(), buf_size, MPI_DOUBLE, nbr_recv, tag_base+1, C.cart_comm, &reqs[0]);
-    MPI_Isend(sendbuf.data(), buf_size, MPI_DOUBLE, nbr_send, tag_base,   C.cart_comm, &reqs[1]);
-    MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
-    unpack(is_max);
 }

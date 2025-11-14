@@ -7,8 +7,8 @@
 #include <iostream>
 #include <string>
 
-// 初始化求解参数
-void initialize_SolverParams(SolverParams &P, CartDecomp &C, GridDesc &G);
+// 读取solver.in文件初始化参数
+bool read_solver_params_from_file(const std::string &fname, SolverParams &P, GridDesc &G, CartDecomp &C);
 
 // 初始化流场
 // 均匀场
@@ -25,7 +25,6 @@ void apply_wall_bc(Field3D &F, const LocalDesc &L, int face_id);
 void apply_symmetry_bc(Field3D &F, const LocalDesc &L, int face_id);
 void apply_outflow_bc(Field3D &F, const LocalDesc &L, int face_id);
 void apply_inflow_bc(Field3D &F, const LocalDesc &L, int face_id);
-void apply_periodic_bc(Field3D &F, const LocalDesc &L, const CartDecomp &C, int face);
 
 /// 基础欧拉通量函数
 inline void flux_euler(double rho, double u, double v, double w,
