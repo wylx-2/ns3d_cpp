@@ -62,8 +62,7 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
 
 // 简单的线性重构（标量，2点模板）
 double linear_reconstruction(const std::array<double,2>& stencil) {
-    // 使用模板中间两个点的平均作为简单线性重构
-    return 0.5 * (stencil[0] + stencil[1]);
+    return stencil[0];
 }
 
 // WENO5 重构（标量，5点模板）

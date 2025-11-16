@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <filesystem>
 
 // tecplot 输出函数
 // Write local (per-rank) field data to a Tecplot ASCII file.
@@ -16,11 +17,20 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 	const LocalDesc &L = F.L;
 	int rank = C.rank;
 
+	// ensure output directory exists
+	std::filesystem::path outdir("output");
+	std::error_code ec;
+	std::filesystem::create_directories(outdir, ec);
+	if (ec) {
+		std::cerr << "Warning: could not create output directory 'output': " << ec.message() << "\n";
+	}
+
 	std::ostringstream ss;
 	ss << prefix << "_rank" << rank << ".dat";
-	std::ofstream ofs(ss.str());
+	std::filesystem::path filepath = outdir / ss.str();
+	std::ofstream ofs(filepath.string());
 	if (!ofs) {
-		std::cerr << "Failed to open output file " << ss.str() << " for writing\n";
+		std::cerr << "Failed to open output file " << filepath.string() << " for writing\n";
 		return;
 	}
 
@@ -44,9 +54,9 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 				int gi = L.ox + (i - L.ngx);
 				int gj = L.oy + (j - L.ngy);
 				int gk = L.oz + (k - L.ngz);
-				double x = G.x0 + (gi + 0.5) * G.dx;
-				double y = G.y0 + (gj + 0.5) * G.dy;
-				double z = G.z0 + (gk + 0.5) * G.dz;
+				double x = G.x0 + gi * G.dx;
+				double y = G.y0 + gj * G.dy;
+				double z = G.z0 + gk * G.dz;
 
 				double rho = F.rho[gid];
 				double rhou = F.rhou[gid];
@@ -67,7 +77,7 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 	}
 
 	ofs.close();
-	std::cerr << "Wrote Tecplot file: " << ss.str() << " (rank " << rank << ", time=" << std::scientific << std::setprecision(8) << time << ")\n";
+	std::cerr << "Wrote Tecplot file: " << filepath.string() << " (rank " << rank << ", time=" << std::scientific << std::setprecision(8) << time << ")\n";
 }
 
 
@@ -78,14 +88,23 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 {
 	const LocalDesc &L = F.L;
 	// open file (overwrite if step==0, append otherwise)
+	// ensure output directory exists
+	std::filesystem::path outdir("output");
+	std::error_code ec;
+	std::filesystem::create_directories(outdir, ec);
+	if (ec) {
+		std::cerr << "Warning: could not create output directory 'output': " << ec.message() << "\n";
+	}
+
+	std::filesystem::path filepath = outdir / filename;
 	std::ofstream ofs;
 	if (step == 0) {
-		ofs.open(filename, std::ofstream::out);
+		ofs.open(filepath.string(), std::ofstream::out);
 	} else {
-		ofs.open(filename, std::ofstream::out | std::ofstream::app);
+		ofs.open(filepath.string(), std::ofstream::out | std::ofstream::app);
 	}
 	if (!ofs) {
-		std::cerr << "Failed to open residuals file " << filename << "\n";
+		std::cerr << "Failed to open residuals file " << filepath.string() << "\n";
 		return;
 	}
 

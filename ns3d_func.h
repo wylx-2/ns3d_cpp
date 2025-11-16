@@ -114,5 +114,5 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 void compute_diagnostics(Field3D &F, const SolverParams &P);
 
 // main time advance loop with monitor & output
-void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRequests &out_reqs);
+void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);
 

@@ -73,6 +73,7 @@ bool read_solver_params_from_file(
             else if (v=="laxfriedrichs") P.fvs_type = SolverParams::FVS_Type::LaxFriedrichs;
         }
         else if (k=="recon") {
+            std::cout << "recon=" << v << std::endl;
             if (v=="mdcd") P.recon = SolverParams::Reconstruction::MDCD;
             else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
             else if (v=="wcns") P.recon = SolverParams::Reconstruction::WCNS;
@@ -83,6 +84,7 @@ bool read_solver_params_from_file(
             else if (v=="c6") P.vis_scheme = SolverParams::ViscousScheme::C6th;
         }
         else if (k=="char_recon") {
+            std::cout << "char_recon=" << v << std::endl;
             P.char_recon = (v=="yes" || v=="true");
         }
         else if (k=="stencil") P.stencil = std::stoi(val);
@@ -100,6 +102,12 @@ bool read_solver_params_from_file(
         else if (k=="z0") G.z0 = std::stod(val);
 
         else if (k=="ghost_layers") P.ghost_layers = std::stoi(val);
+
+        // ---- simulation control (allow several common key names) ----
+        else if (k=="max_steps") P.max_steps = std::stoi(val);
+        else if (k=="monitor_freq") P.monitor_freq = std::stoi(val);
+        else if (k=="output_freq") P.output_freq = std::stoi(val);
+        else if (k=="totaltime") P.TotalTime = std::stod(val);
 
         // ---- 边界条件 ----
         auto parse_bc = [&](const std::string &v) {

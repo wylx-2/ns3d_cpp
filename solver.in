@@ -4,7 +4,7 @@
 
 # Physical parameters
 gamma       = 1.4
-mu          = 1.0e-3
+mu          = 0.0
 Pr          = 0.71
 Rgas        = 287.058
 
@@ -12,20 +12,20 @@ Rgas        = 287.058
 cfl         = 0.1
 
 # Reconstruction and schemes
-fvs_type    = StegerWarming      # {StegerWarming, VanLeer, LaxFriedrichs}
-recon       = MDCD               # {WENO5, WCNS, MDCD, Linear}
-vis_scheme  = C6th               # {C2, C4, C6, C8}
+fvs_type    = StegerWarming     
+recon       = LINEAR
+vis_scheme  = C6th              
 char_recon  = no
-stencil     = 6
+stencil     = 2
 
 # MDCD Parameter
 mdcd_disp = 0.0463783
-mdcd_diss = 0.01
+mdcd_diss = 0.1
 
 # Grid
-global_nx   = 16
-global_ny   = 16
-global_nz   = 2
+global_nx   = 40
+global_ny   = 40
+global_nz   = 8
 
 # Ghost layers
 ghost_layers = 3
@@ -42,3 +42,9 @@ bc_zmax = Outflow
 x0 = 0.0
 y0 = 0.0
 z0 = 0.0
+
+# simulation control
+max_steps = 60
+monitor_freq = 10
+output_freq = 10
+TotalTime = 10.0

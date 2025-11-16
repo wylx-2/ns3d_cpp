@@ -126,7 +126,7 @@ struct SolverParams {
     BCType bc_zmax = BCType::Periodic;
 
     // simulation control
-    int max_steps = 5;
+    int max_steps = 1;
     int monitor_freq = 1;
     int output_freq = 1;
     double TotalTime = 1.0;
@@ -439,7 +439,6 @@ inline void pack_x_face_send(const Field3D &F, std::vector<double> &buf, int sen
     int gx = L.ngx;
     int ny = L.ny, nz = L.nz;
     int sx = L.sx, sy = L.sy, sz = L.sz;
-    // For simplicity we pack conserved variables (rho, rhou, rhov, rhow, E)
     // buffer size expected = gx * ny * nz * 5
     int p = 0;
     int istart = send_left ? L.ngx : (L.ngx + L.nx - gx);
