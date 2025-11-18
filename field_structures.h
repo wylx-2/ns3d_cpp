@@ -82,7 +82,7 @@ inline int idx_fz(int i, int j, int k_face, const LocalDesc &L) noexcept {
 
 struct SolverParams {
     double gamma = 1.4;      // ratio of specific heats
-    double mu = 1.0e-3;      // dynamic viscosity
+    double mu = 0.0;      // dynamic viscosity
     double Pr = 0.71;        // Prandtl number
     double Rgas = 287.058;   // specific gas constant (J/kg/K), optional
     double cfl = 0.1;
@@ -321,6 +321,13 @@ struct Field3D {
     inline double& RHS_RhoV(int i, int j, int k) noexcept { return rhs_rhov[I(i,j,k)]; }
     inline double& RHS_RhoW(int i, int j, int k) noexcept { return rhs_rhow[I(i,j,k)]; }
     inline double& RHS_E(int i, int j, int k) noexcept { return rhs_E[I(i,j,k)]; }
+
+    // Debugging helpers: set/add RHS for mass with logging (prints each modification)
+    inline void ShowRHS_Rho(int i, int j, int k, int num) noexcept {
+        int id = I(i,j,k);
+        std::cout << "[RHS_DEBUG "<< num <<"] RHS_Rho(" << i << "," << j << "," << k << ") = " << rhs_rho[id] << std::endl;
+    }
+
 
     // accessors for fluxes at cell centers
     inline double& Fflux_Mass(int i, int j, int k) noexcept { return Fflux_mass[I(i,j,k)]; }

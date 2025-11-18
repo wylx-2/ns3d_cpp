@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
     F.allocate(L);
     //initialize_uniform_field(F, G, P);  // Initialize field
     initialize_riemann_2d(F, G, P);
+    // initialize_sod_shock_tube(F, G, P);
 
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange
     F.primitiveToConserved(P); // update primitive variables (including ghosts)

@@ -47,7 +47,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
                 std::cout << std::fixed << std::setprecision(6)
                           << "[Step " << step << "] "
                           << "dt=" << dt
-                          << "  E_tot=" << F.global_Etot
+                          << "  E_avg=" << F.global_Etot/(F.L.nx*F.L.ny*F.L.nz)
                           << "  Time/step=" << t_step << "s"
                           << "  Elapsed=" << t_elapsed << "s\n";
                 std::stringstream ss;

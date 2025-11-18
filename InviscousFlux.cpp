@@ -61,16 +61,32 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     int stencil = P.stencil;
 
     // X方向通量重构
+    if (stencil < 2) {
+        std::cerr << "computeFVSFluxes: stencil must be >= 2\n";
+        return;
+    }
+    // center offset for mapping stencil indices m -> cell indices ii
+    // use (stencil-1)/2 so that for even stencil (e.g. 6) m indices map to i-2..i+3
+    int mid = (stencil - 1) / 2;
+    // quick sanity: require domain size to contain stencil
+    if (L.sx < stencil || L.sy < stencil || L.sz < stencil) {
+        std::cerr << "computeFVSFluxes: local array too small for stencil\n";
+        return;
+    }
+
     for (int k = ngz; k < ngz+nz; ++k) {
         for (int j = ngy; j < ngy+ny; ++j) {
-            for (int i = ngx-1; i < ngx+nx; ++i) {
+            // choose i range so that ii = i + (m-mid) stays inside [0, L.sx-1]
+            int i_start = std::max(ngx-1, mid);
+            int i_end = std::min(ngx+nx-1, L.sx - 1 - (stencil - 1 - mid));
+            for (int i = i_start; i <= i_end; ++i) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
 
                 for (int m = 0; m < stencil; ++m) {
-                    int ii = i + (m - (stencil/2)); // 以i为中心的stencil(6点模板为i-2到i+3)
+                    int ii = i + (m - mid); // 以i为中心的stencil(6点模板为i-2到i+3) when mid=(stencil-1)/2
                     int id = F.I(ii, j, k);
 
                     Ft[0][m] = F.Fflux_mass[id];
@@ -106,14 +122,16 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     // Y方向通量重构
     for (int k = ngz; k < ngz+nz; ++k) {
         for (int i = ngx; i < ngx+nx; ++i) {
-            for (int j = ngy-1; j < ngy+ny; ++j) {
+            int j_start = std::max(ngy-1, mid);
+            int j_end = std::min(ngy+ny-1, L.sy - 1 - (stencil - 1 - mid));
+            for (int j = j_start; j <= j_end; ++j) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
 
                 for (int m = 0; m < stencil; ++m) {
-                    int jj = j + (m - (stencil/2));
+                    int jj = j + (m - mid);
                     int id = F.I(i, jj, k);
 
                     Ft[0][m] = F.Hflux_mass[id];
@@ -149,14 +167,16 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     // Z方向通量重构
     for (int j = ngy; j < ngy+ny; ++j) {
         for (int i = ngx; i < ngx+nx; ++i) {
-            for (int k = ngz-1; k < ngz+nz; ++k) {
+            int k_start = std::max(ngz-1, mid);
+            int k_end = std::min(ngz+nz-1, L.sz - 1 - (stencil - 1 - mid));
+            for (int k = k_start; k <= k_end; ++k) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> ut(VAR, std::vector<double>(stencil));
 
                 for (int m = 0; m < stencil; ++m) {
-                    int kk = k + (m - (stencil/2));
+                    int kk = k + (m - mid);
                     int id = F.I(i, j, kk);
 
                     Ft[0][m] = F.Gflux_mass[id];
@@ -369,10 +389,15 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
         lamda[4][m] = V + c;
     }
 
-    // 2) choose interface (left / right) states as stencil center positions:
-    //    In your reference: left at index 2 (i), right at 3 (i+1)
+    // 2) choose interface (left / right) states as stencil center positions.
+    // For a runtime stencil length `stencil`, pick the middle split as
+    // mid = stencil/2, then left = mid-1, right = mid. This maps correctly
+    // for even (e.g. 6 -> left=2,right=3) and odd (e.g. 5 -> left=1,right=2)
+    int mid = stencil / 2;
     double Ul[VAR], Ur[VAR];
-    for (int n = 0; n < VAR; ++n) { Ul[n] = Ut[n][2]; Ur[n] = Ut[n][3]; }
+    int ileft = std::max(0, mid - 1);
+    int iright = std::min(stencil - 1, mid);
+    for (int n = 0; n < VAR; ++n) { Ul[n] = Ut[n][ileft]; Ur[n] = Ut[n][iright]; }
 
     // 3) compute Roe averaged eigenvectors and lambar
     double Lmat[VAR][VAR], Rmat[VAR][VAR], lambar[VAR];
@@ -401,9 +426,12 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
         default: {
             // Roe with entropy correction (approx)
             for (int n = 0; n < VAR; ++n) {
-                double eps = 4.0 * std::max(std::max(lambar[n] - lamda[n][2], lamda[n][3] - lambar[n]), 0.0);
-                if (abs(lambar[n]) < eps) lamdamax[n] = (lambar[n]*lambar[n] + eps*eps) / (2.0 * eps);
-                else lamdamax[n] = abs(lambar[n]);
+                // use the two entries adjacent to the interface (ileft, iright)
+                double diff1 = lambar[n] - lamda[n][ileft];
+                double diff2 = lamda[n][iright] - lambar[n];
+                double eps = 4.0 * std::max(std::max(diff1, diff2), 0.0);
+                if (std::abs(lambar[n]) < eps) lamdamax[n] = (lambar[n]*lambar[n] + eps*eps) / (2.0 * eps);
+                else lamdamax[n] = std::abs(lambar[n]);
             }
         } break;
     }

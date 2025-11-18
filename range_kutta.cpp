@@ -49,7 +49,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
         double fy_b = F.FY_mass(i, j - 1, k);
         double fz_f = F.FZ_mass(i, j, k);
         double fz_b = F.FZ_mass(i, j, k - 1);
-        F.RHS_Rho(i, j, k) = -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
+        F.RHS_Rho(i, j, k) += -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
 
         // momentum x
         fx_r = F.FX_momx(i, j, k);
@@ -58,7 +58,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
         fy_b = F.FY_momx(i, j - 1, k);
         fz_f = F.FZ_momx(i, j, k);
         fz_b = F.FZ_momx(i, j, k - 1);
-        F.RHS_RhoU(i, j, k) = -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
+        F.RHS_RhoU(i, j, k) += -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
 
         // momentum y
         fx_r = F.FX_momy(i, j, k);
@@ -67,7 +67,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
         fy_b = F.FY_momy(i, j - 1, k);
         fz_f = F.FZ_momy(i, j, k);
         fz_b = F.FZ_momy(i, j, k - 1);
-        F.RHS_RhoV(i, j, k) = -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
+        F.RHS_RhoV(i, j, k) += -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
 
         // momentum z
         fx_r = F.FX_momz(i, j, k);
@@ -76,7 +76,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
         fy_b = F.FY_momz(i, j - 1, k);
         fz_f = F.FZ_momz(i, j, k);
         fz_b = F.FZ_momz(i, j, k - 1);
-        F.RHS_RhoW(i, j, k) = -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
+        F.RHS_RhoW(i, j, k) += -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
 
         // energy
         fx_r = F.FX_E(i, j, k);
@@ -85,7 +85,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
         fy_b = F.FY_E(i, j - 1, k);
         fz_f = F.FZ_E(i, j, k);
         fz_b = F.FZ_E(i, j, k - 1);
-        F.RHS_E(i, j, k) = -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
+        F.RHS_E(i, j, k) += -((fx_r - fx_l) * idx + (fy_t - fy_b) * idy + (fz_f - fz_b) * idz);
     }}}
 }
 
@@ -228,7 +228,7 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
     MPI_Allreduce(&count, &g_N, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     // input diagnostics
-    F.global_Etot = g_E*F.L.nx*F.L.ny*F.L.nz;
+    F.global_Etot = g_E;
     // residual = (g_sum_abs_res_rho / g_N) / g_max_abs_rho;
     F.global_res_rho = std::sqrt( (g_sum_sq_res_rho / g_N) ) / g_max_abs_rho;
     F.global_res_rhou = std::sqrt( (g_sum_sq_res_rhou / g_N) ) / g_max_abs_rhou;

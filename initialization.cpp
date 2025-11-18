@@ -172,16 +172,16 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 
                 // ========= 四象限 Riemann ===============
                 if (x >= x_mid && y >= y_mid) {          // 区域 I
-                    rho = 1.0;     u = 0.0;     v = 0.0;     p = 1.0;
+                    rho = 1.5;     u = 0.0;     v = 0.0;     p = 1.5;
                 }
                 else if (x < x_mid && y >= y_mid) {      // 区域 II
-                    rho = 0.5197;  u = -0.7259; v = 0.0;     p = 0.4;
+                    rho = 0.5323;  u = 1.206;   v = 0.0;     p = 0.3;
                 }
                 else if (x < x_mid && y < y_mid) {       // 区域 III
-                    rho = 0.1072;  u = -0.7259; v = -0.7259; p = 0.0439;
+                    rho = 0.138;   u = 1.206;   v = 1.206;   p = 0.029;
                 }
                 else {                                   // 区域 IV
-                    rho = 0.2579;  u = 0.0;     v = -0.7259; p = 0.15;
+                    rho = 0.5323;  u = 0.0;     v = 1.206;   p = 0.3;
                 }
 
                 // ========= 写入数据 =========
@@ -194,6 +194,37 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
                 F.p[id]   = p;
             }
         }
+    }
+}
+
+void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P)
+{
+    // Sod shock tube along x direction
+    LocalDesc &L = F.L;
+    const double gamma = P.gamma;
+    const double x_mid = 0.5 * G.global_nx * G.dx;
+
+    for (int k=L.ngz; k<L.ngz+L.nz; ++k)
+    for (int j=L.ngy; j<L.ngy+L.ny; ++j)
+    for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
+        int id = F.I(i,j,k);
+        double x = (L.ox + i - L.ngx + 0.5) * G.dx;
+        double rho, u, v, w, p;
+        v = 0.0; w = 0.0;
+        if (x < x_mid) {
+            rho = 1.0;
+            u = 0.0;
+            p = 1.0;
+        } else {
+            rho = 0.125;
+            u = 0.0;
+            p = 0.1;
+        }
+        F.rho[id] = rho;
+        F.u[id] = u;
+        F.v[id] = v;
+        F.w[id] = w;
+        F.p[id] = p;
     }
 }
 

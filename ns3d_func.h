@@ -17,6 +17,9 @@ void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams 
 // 2D Riemann 问题初始条件
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 
+// sod shock tube 初始条件
+void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P);
+
 // 边界条件处理函数
 void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);
 
