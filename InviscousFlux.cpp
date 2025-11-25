@@ -457,7 +457,6 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
     // 3) compute Roe averaged eigenvectors and lambar
     double Lmat[VAR][VAR], Rmat[VAR][VAR], lambar[VAR];
     build_eigen_matrices(ul, ur, nx, ny, nz, gamma, Lmat, Rmat, lambar);
-    std::cout << "characteric - wise has been called"<<std::endl;
     for (int m = 0; m < stencil; ++m) {
         for (int n = 0; n < VAR; ++n) {
             double sumw = 0.0, sumLU = 0.0;
