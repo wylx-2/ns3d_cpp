@@ -76,7 +76,6 @@ bool read_solver_params_from_file(
             std::cout << "recon=" << v << std::endl;
             if (v=="mdcd") P.recon = SolverParams::Reconstruction::MDCD;
             else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
-            else if (v=="wcns") P.recon = SolverParams::Reconstruction::WCNS;
             else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
         }
         else if (k=="vis_scheme") {
@@ -87,7 +86,6 @@ bool read_solver_params_from_file(
             std::cout << "char_recon=" << v << std::endl;
             P.char_recon = (v=="yes" || v=="true");
         }
-        else if (k=="stencil") P.stencil = std::stoi(val);
         
         else if (k=="mdcd_diss") P.mdcd_diss = std::stod(val);
         else if (k=="mdcd_disp") P.mdcd_disp = std::stod(val);
@@ -100,8 +98,6 @@ bool read_solver_params_from_file(
         else if (k=="x0") G.x0 = std::stod(val);
         else if (k=="y0") G.y0 = std::stod(val);
         else if (k=="z0") G.z0 = std::stod(val);
-
-        else if (k=="ghost_layers") P.ghost_layers = std::stoi(val);
 
         // ---- simulation control (allow several common key names) ----
         else if (k=="max_steps") P.max_steps = std::stoi(val);
@@ -143,6 +139,22 @@ bool read_solver_params_from_file(
     G.dx = 1.0 / G.global_nx;
     G.dy = 1.0 / G.global_ny;
     G.dz = 1.0 / G.global_nz;
+
+    // 根据重构格式设置ghost层数和stencil大小
+    switch (P.recon) {
+        case SolverParams::Reconstruction::WENO5:
+            P.ghost_layers = 3;
+            P.stencil = 6;
+            break;
+        case SolverParams::Reconstruction::LINEAR:
+            P.ghost_layers = 2;
+            P.stencil = 2;
+            break;
+        case SolverParams::Reconstruction::MDCD:
+            P.ghost_layers = 3;
+            P.stencil = 6;
+            break;
+    }
 
     return true;
 }

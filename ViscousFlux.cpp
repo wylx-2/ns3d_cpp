@@ -26,6 +26,8 @@ inline double diff_6th_central(const std::vector<double> &f, int i, double dx) {
     return (-f[i+3] + 9.0*f[i+2] - 45.0*f[i+1] + 45.0*f[i-1] - 9.0*f[i-2] + f[i-3]) / (60.0*dx);
 }
 
+
+// C4th/C6th 改这个函数
 inline int choose_scheme(int idx, int nstart, int nend, bool periodic)
 {
     if (periodic)

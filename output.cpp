@@ -98,7 +98,7 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 
 	std::filesystem::path filepath = outdir / filename;
 	std::ofstream ofs;
-	if (step == 0) {
+	if (step == 1) {
 		ofs.open(filepath.string(), std::ofstream::out);
 	} else {
 		ofs.open(filepath.string(), std::ofstream::out | std::ofstream::app);
@@ -108,7 +108,7 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 		return;
 	}
 
-	if (step == 0) {
+	if (step == 1) {
 		ofs << "TITLE = \"Residuals vs Step\"\n";
 		ofs << "VARIABLES = \"Step\" \"Res_rho\" \"Res_rhou\" \"Res_rhov\" \"Res_rhow\" \"Res_E\" \"Etot\"\n";
 	}

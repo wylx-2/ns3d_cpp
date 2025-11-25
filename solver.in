@@ -12,23 +12,19 @@ Rgas        = 287.058
 cfl         = 0.1
 
 # Reconstruction and schemes
-fvs_type    = VanLeer     
-recon       = MDCD
+fvs_type    = LaxFriedrichs     
+recon       = WENO5
 vis_scheme  = C6th
-char_recon  = no
-stencil     = 6
+char_recon  = true
 
 # MDCD Parameter
 mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 64
-global_ny   = 64
+global_nx   = 32
+global_ny   = 32
 global_nz   = 6
-
-# Ghost layers
-ghost_layers = 3
 
 # Boundary conditions
 bc_xmin = Outflow
@@ -44,7 +40,7 @@ y0 = 0.0
 z0 = 0.0
 
 # simulation control
-max_steps = 5000
-monitor_freq = 50
-output_freq = 100
+max_steps = 10
+monitor_freq = 1
+output_freq = 2
 TotalTime = 10.0

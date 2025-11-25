@@ -20,6 +20,11 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 // sod shock tube 初始条件
 void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P);
 
+// 三维各向同均匀湍流初始条件
+void initialize_isotropic_turbulence_spectral(Field3D &F, const GridDesc &G, const SolverParams &P, const CartDecomp &C,
+                                              double u_rms_target = 1.0, double k0 = 5.0,
+                                              unsigned seed = 12345, double rho0 = 1.0, double p0 = 1.0);
+
 // 边界条件处理函数
 void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);
 
@@ -46,7 +51,7 @@ double linear_reconstruction(const std::array<double,2> &stencil);
 double mdcd_reconstruction(const std::array<double,6>& stencil, SolverParams P);
 
 // WENO5 重构（标量，5 点模板）
-double weno5_reconstruction(const std::array<double,5> &stencil);
+double weno5_reconstruction(const std::array<double,6> &stencil);
 
 // C6th 六阶中心差分重构（标量，6 点模板）
 double c6th_reconstruction(const std::array<double,6> &stencil);

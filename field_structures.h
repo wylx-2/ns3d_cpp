@@ -91,6 +91,7 @@ struct SolverParams {
     enum class FVS_Type {
         StegerWarming,
         LaxFriedrichs,
+        Rusanov,         // Local Lax-Friedrichs
         VanLeer
     };
     FVS_Type fvs_type = FVS_Type::StegerWarming;
@@ -575,10 +576,8 @@ inline void unpack_z_face_recv(Field3D &F, const std::vector<double> &buf, int r
     assert(p == (int)buf.size());
 }
 
-// --------------------------- packing/unpacking for gradient fields --------------
-// We pack the 12 derivative fields: du_dx, du_dy, du_dz, dv_dx, dv_dy, dv_dz,
-// dw_dx, dw_dy, dw_dz, dT_dx, dT_dy, dT_dz. Order must be consistent between send/unpack.
-inline void pack_x_face_send_grad(const Field3D &F, std::vector<double> &buf, int send_left) {
+// --------------------------- packing/unpacking for viscous flux --------------
+inline void pack_x_face_send_vis_flux(const Field3D &F, std::vector<double> &buf, int send_left) {
     const LocalDesc &L = F.L;
     int gx = L.ngx;
     int ny = L.ny, nz = L.nz;
@@ -589,17 +588,16 @@ inline void pack_x_face_send_grad(const Field3D &F, std::vector<double> &buf, in
             for (int ii = 0; ii < gx; ++ii) {
                 int i = istart + ii;
                 int id = F.I(i,j,k);
-                buf[p++] = F.du_dx[id]; buf[p++] = F.du_dy[id]; buf[p++] = F.du_dz[id];
-                buf[p++] = F.dv_dx[id]; buf[p++] = F.dv_dy[id]; buf[p++] = F.dv_dz[id];
-                buf[p++] = F.dw_dx[id]; buf[p++] = F.dw_dy[id]; buf[p++] = F.dw_dz[id];
-                buf[p++] = F.dT_dx[id]; buf[p++] = F.dT_dy[id]; buf[p++] = F.dT_dz[id];
+                buf[p++] = F.Fvflux_momx[id]; buf[p++] = F.Fvflux_momy[id]; buf[p++] = F.Fvflux_momz[id];buf[p++] = F.Fvflux_E[id]; 
+                buf[p++] = F.Hvflux_momx[id]; buf[p++] = F.Hvflux_momy[id]; buf[p++] = F.Hvflux_momz[id];buf[p++] = F.Hvflux_E[id];
+                buf[p++] = F.Gvflux_momx[id]; buf[p++] = F.Gvflux_momy[id]; buf[p++] = F.Gvflux_momz[id];buf[p++] = F.Gvflux_E[id];
             }
         }
     }
     assert(p == (int)buf.size());
 }
 
-inline void unpack_x_face_recv_grad(Field3D &F, const std::vector<double> &buf, int recv_left) {
+inline void unpack_x_face_recv_vis_flux(Field3D &F, const std::vector<double> &buf, int recv_left) {
     const LocalDesc &L = F.L;
     int gx = L.ngx;
     int ny = L.ny, nz = L.nz;
@@ -610,17 +608,16 @@ inline void unpack_x_face_recv_grad(Field3D &F, const std::vector<double> &buf, 
             for (int ii = 0; ii < gx; ++ii) {
                 int i = istart + ii;
                 int id = F.I(i,j,k);
-                F.du_dx[id] = buf[p++]; F.du_dy[id] = buf[p++]; F.du_dz[id] = buf[p++];
-                F.dv_dx[id] = buf[p++]; F.dv_dy[id] = buf[p++]; F.dv_dz[id] = buf[p++];
-                F.dw_dx[id] = buf[p++]; F.dw_dy[id] = buf[p++]; F.dw_dz[id] = buf[p++];
-                F.dT_dx[id] = buf[p++]; F.dT_dy[id] = buf[p++]; F.dT_dz[id] = buf[p++];
+                F.Fvflux_momx[id] = buf[p++]; F.Fvflux_momy[id] = buf[p++]; F.Fvflux_momz[id] = buf[p++]; F.Fvflux_E[id] = buf[p++];
+                F.Hvflux_momx[id] = buf[p++]; F.Hvflux_momy[id] = buf[p++]; F.Hvflux_momz[id] = buf[p++]; F.Hvflux_E[id] = buf[p++];
+                F.Gvflux_momx[id] = buf[p++]; F.Gvflux_momy[id] = buf[p++]; F.Gvflux_momz[id] = buf[p++]; F.Gvflux_E[id] = buf[p++];
             }
         }
     }
     assert(p == (int)buf.size());
 }
 
-inline void pack_y_face_send_grad(const Field3D &F, std::vector<double> &buf, int send_bottom) {
+inline void pack_y_face_send_vis_flux(const Field3D &F, std::vector<double> &buf, int send_bottom) {
     const LocalDesc &L = F.L;
     int gy = L.ngy;
     int nx = L.nx, nz = L.nz;
@@ -631,17 +628,16 @@ inline void pack_y_face_send_grad(const Field3D &F, std::vector<double> &buf, in
             int j = jstart + jj;
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
-                buf[p++] = F.du_dx[id]; buf[p++] = F.du_dy[id]; buf[p++] = F.du_dz[id];
-                buf[p++] = F.dv_dx[id]; buf[p++] = F.dv_dy[id]; buf[p++] = F.dv_dz[id];
-                buf[p++] = F.dw_dx[id]; buf[p++] = F.dw_dy[id]; buf[p++] = F.dw_dz[id];
-                buf[p++] = F.dT_dx[id]; buf[p++] = F.dT_dy[id]; buf[p++] = F.dT_dz[id];
+                buf[p++] = F.Fvflux_momx[id]; buf[p++] = F.Fvflux_momy[id]; buf[p++] = F.Fvflux_momz[id];buf[p++] = F.Fvflux_E[id];
+                buf[p++] = F.Hvflux_momx[id]; buf[p++] = F.Hvflux_momy[id]; buf[p++] = F.Hvflux_momz[id];buf[p++] = F.Hvflux_E[id];
+                buf[p++] = F.Gvflux_momx[id]; buf[p++] = F.Gvflux_momy[id]; buf[p++] = F.Gvflux_momz[id];buf[p++] = F.Gvflux_E[id];
             }
         }
     }
     assert(p == (int)buf.size());
 }
 
-inline void unpack_y_face_recv_grad(Field3D &F, const std::vector<double> &buf, int recv_bottom) {
+inline void unpack_y_face_recv_vis_flux(Field3D &F, const std::vector<double> &buf, int recv_bottom) {
     const LocalDesc &L = F.L;
     int gy = L.ngy;
     int nx = L.nx, nz = L.nz;
@@ -652,17 +648,16 @@ inline void unpack_y_face_recv_grad(Field3D &F, const std::vector<double> &buf, 
             int j = jstart + jj;
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
-                F.du_dx[id] = buf[p++]; F.du_dy[id] = buf[p++]; F.du_dz[id] = buf[p++];
-                F.dv_dx[id] = buf[p++]; F.dv_dy[id] = buf[p++]; F.dv_dz[id] = buf[p++];
-                F.dw_dx[id] = buf[p++]; F.dw_dy[id] = buf[p++]; F.dw_dz[id] = buf[p++];
-                F.dT_dx[id] = buf[p++]; F.dT_dy[id] = buf[p++]; F.dT_dz[id] = buf[p++];
+                F.Fvflux_momx[id] = buf[p++]; F.Fvflux_momy[id] = buf[p++]; F.Fvflux_momz[id] = buf[p++]; F.Fvflux_E[id] = buf[p++];
+                F.Hvflux_momx[id] = buf[p++]; F.Hvflux_momy[id] = buf[p++]; F.Hvflux_momz[id] = buf[p++]; F.Hvflux_E[id] = buf[p++];
+                F.Gvflux_momx[id] = buf[p++]; F.Gvflux_momy[id] = buf[p++]; F.Gvflux_momz[id] = buf[p++]; F.Gvflux_E[id] = buf[p++];
             }
         }
     }
     assert(p == (int)buf.size());
 }
 
-inline void pack_z_face_send_grad(const Field3D &F, std::vector<double> &buf, int send_back) {
+inline void pack_z_face_send_vis_flux(const Field3D &F, std::vector<double> &buf, int send_back) {
     const LocalDesc &L = F.L;
     int gz = L.ngz;
     int nx = L.nx, ny = L.ny;
@@ -673,17 +668,16 @@ inline void pack_z_face_send_grad(const Field3D &F, std::vector<double> &buf, in
         for (int j = L.ngy; j < L.ngy + ny; ++j) {
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
-                buf[p++] = F.du_dx[id]; buf[p++] = F.du_dy[id]; buf[p++] = F.du_dz[id];
-                buf[p++] = F.dv_dx[id]; buf[p++] = F.dv_dy[id]; buf[p++] = F.dv_dz[id];
-                buf[p++] = F.dw_dx[id]; buf[p++] = F.dw_dy[id]; buf[p++] = F.dw_dz[id];
-                buf[p++] = F.dT_dx[id]; buf[p++] = F.dT_dy[id]; buf[p++] = F.dT_dz[id];
+                buf[p++] = F.Fvflux_momx[id]; buf[p++] = F.Fvflux_momy[id]; buf[p++] = F.Fvflux_momz[id];buf[p++] = F.Fvflux_E[id];
+                buf[p++] = F.Hvflux_momx[id]; buf[p++] = F.Hvflux_momy[id]; buf[p++] = F.Hvflux_momz[id];buf[p++] = F.Hvflux_E[id];
+                buf[p++] = F.Gvflux_momx[id]; buf[p++] = F.Gvflux_momy[id]; buf[p++] = F.Gvflux_momz[id];buf[p++] = F.Gvflux_E[id];
             }
         }
     }
     assert(p == (int)buf.size());
 }
 
-inline void unpack_z_face_recv_grad(Field3D &F, const std::vector<double> &buf, int recv_back) {
+inline void unpack_z_face_recv_vis_flux(Field3D &F, const std::vector<double> &buf, int recv_back) {
     const LocalDesc &L = F.L;
     int gz = L.ngz;
     int nx = L.nx, ny = L.ny;
@@ -694,10 +688,9 @@ inline void unpack_z_face_recv_grad(Field3D &F, const std::vector<double> &buf, 
         for (int j = L.ngy; j < L.ngy + ny; ++j) {
             for (int i = L.ngx; i < L.ngx + nx; ++i) {
                 int id = F.I(i,j,k);
-                F.du_dx[id] = buf[p++]; F.du_dy[id] = buf[p++]; F.du_dz[id] = buf[p++];
-                F.dv_dx[id] = buf[p++]; F.dv_dy[id] = buf[p++]; F.dv_dz[id] = buf[p++];
-                F.dw_dx[id] = buf[p++]; F.dw_dy[id] = buf[p++]; F.dw_dz[id] = buf[p++];
-                F.dT_dx[id] = buf[p++]; F.dT_dy[id] = buf[p++]; F.dT_dz[id] = buf[p++];
+                F.Fvflux_momx[id] = buf[p++]; F.Fvflux_momy[id] = buf[p++]; F.Fvflux_momz[id] = buf[p++]; F.Fvflux_E[id] = buf[p++];
+                F.Hvflux_momx[id] = buf[p++]; F.Hvflux_momy[id] = buf[p++]; F.Hvflux_momz[id] = buf[p++]; F.Hvflux_E[id] = buf[p++];
+                F.Gvflux_momx[id] = buf[p++]; F.Gvflux_momy[id] = buf[p++]; F.Gvflux_momz[id] = buf[p++]; F.Gvflux_E[id] = buf[p++];
             }
         }
     }
@@ -705,11 +698,11 @@ inline void unpack_z_face_recv_grad(Field3D &F, const std::vector<double> &buf, 
 }
 
 // High-level halo exchange routine (non-blocking) for gradient fields
-inline void exchange_halos_gradients(Field3D &F, CartDecomp &C, LocalDesc &L, HaloRequests &out_reqs) {
+inline void exchange_halos_viscous_flux(Field3D &F, CartDecomp &C, LocalDesc &L, HaloRequests &out_reqs) {
     int gx = L.ngx, gy = L.ngy, gz = L.ngz;
     int nx = L.nx, ny = L.ny, nz = L.nz;
 
-    // 12 derivative fields
+    // viscous fluxes: 3 directions * 4 variables (rhou, rhov, rhow, E) = 12 variables
     const int nvars = 12;
     int pack_x_size = gx * ny * nz * nvars;
     int pack_y_size = gy * nx * nz * nvars;
@@ -722,12 +715,12 @@ inline void exchange_halos_gradients(Field3D &F, CartDecomp &C, LocalDesc &L, Ha
     std::vector<double> send_z_back(pack_z_size), send_z_front(pack_z_size);
     std::vector<double> recv_z_back(pack_z_size), recv_z_front(pack_z_size);
 
-    pack_x_face_send_grad(F, send_x_left, 1);
-    pack_x_face_send_grad(F, send_x_right, 0);
-    pack_y_face_send_grad(F, send_y_bot, 1);
-    pack_y_face_send_grad(F, send_y_top, 0);
-    pack_z_face_send_grad(F, send_z_back, 1);
-    pack_z_face_send_grad(F, send_z_front, 0);
+    pack_x_face_send_vis_flux(F, send_x_left, 1);
+    pack_x_face_send_vis_flux(F, send_x_right, 0);
+    pack_y_face_send_vis_flux(F, send_y_bot, 1);
+    pack_y_face_send_vis_flux(F, send_y_top, 0);
+    pack_z_face_send_vis_flux(F, send_z_back, 1);
+    pack_z_face_send_vis_flux(F, send_z_front, 0);
 
     out_reqs.reqs.clear();
     out_reqs.stats.resize(6);
@@ -754,12 +747,12 @@ inline void exchange_halos_gradients(Field3D &F, CartDecomp &C, LocalDesc &L, Ha
 
     MPI_Waitall((int)out_reqs.reqs.size(), out_reqs.reqs.data(), MPI_STATUSES_IGNORE);
 
-    unpack_x_face_recv_grad(F, recv_x_left, 1);
-    unpack_x_face_recv_grad(F, recv_x_right, 0);
-    unpack_y_face_recv_grad(F, recv_y_bot, 1);
-    unpack_y_face_recv_grad(F, recv_y_top, 0);
-    unpack_z_face_recv_grad(F, recv_z_back, 1);
-    unpack_z_face_recv_grad(F, recv_z_front, 0);
+    unpack_x_face_recv_vis_flux(F, recv_x_left, 1);
+    unpack_x_face_recv_vis_flux(F, recv_x_right, 0);
+    unpack_y_face_recv_vis_flux(F, recv_y_bot, 1);
+    unpack_y_face_recv_vis_flux(F, recv_y_top, 0);
+    unpack_z_face_recv_vis_flux(F, recv_z_back, 1);
+    unpack_z_face_recv_vis_flux(F, recv_z_front, 0);
 }
 
 // High-level halo exchange routine (non-blocking) for conserved variables

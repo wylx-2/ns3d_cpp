@@ -23,9 +23,9 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
 
     // helper to optionally reverse according to sign(flag)
     if (r == SolverParams::Reconstruction::WENO5) {
-        require_size(5, "WENO5");
-        std::array<double,5> a5;
-        for (int i = 0; i < 5; ++i) a5[i] = vstencil[i];
+        require_size(6, "WENO5");
+        std::array<double,6> a5;
+        for (int i = 0; i < 6; ++i) a5[i] = vstencil[i];
         if (flag < 0.0) std::reverse(a5.begin(), a5.end());
         return weno5_reconstruction(a5);
     }
@@ -65,8 +65,8 @@ double linear_reconstruction(const std::array<double,2>& stencil) {
     return stencil[0];
 }
 
-// WENO5 重构（标量，5点模板）
-double weno5_reconstruction(const std::array<double,5>& stencil) {
+// WENO5 重构（标量，6点模板）
+double weno5_reconstruction(const std::array<double,6>& stencil) {
     double f0 = stencil[0];
     double f1 = stencil[1];
     double f2 = stencil[2];

@@ -32,6 +32,7 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     // 计算粘性通量
     compute_viscous_flux(F, P);
     // 应该在这里交换粘性通量的halo区域，并处理周期边界
+    exchange_halos_viscous_flux(F, C, L, out_reqs); //还需要额外边界处理！
 
     // 粘性通量的导数
     compute_vis_flux(F, G);

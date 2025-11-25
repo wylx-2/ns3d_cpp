@@ -55,31 +55,32 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     const LocalDesc &L = F.L;
     int nx = L.nx, ny = L.ny, nz = L.nz;
     int ngx = L.ngx, ngy = L.ngy, ngz = L.ngz;
+    int sz = L.sz, sy = L.sy, sx = L.sx;
     const int VAR = 5; // 变量个数：rho, rhou, rhov, rhow, E
     // Use runtime stencil size from SolverParams so different reconstructions
     // (WENO5, C6th, ...) can be selected at runtime.
     int stencil = P.stencil;
 
-    // X方向通量重构
+    
     if (stencil < 2) {
         std::cerr << "computeFVSFluxes: stencil must be >= 2\n";
         return;
     }
+    
     // center offset for mapping stencil indices m -> cell indices ii
     // use (stencil-1)/2 so that for even stencil (e.g. 6) m indices map to i-2..i+3
     int mid = (stencil - 1) / 2;
     // quick sanity: require domain size to contain stencil
-    if (L.sx < stencil || L.sy < stencil || L.sz < stencil) {
+    if (sx < stencil || sy < stencil || sz < stencil) {
         std::cerr << "computeFVSFluxes: local array too small for stencil\n";
         return;
     }
 
+    // X方向通量重构
     for (int k = ngz; k < ngz+nz; ++k) {
         for (int j = ngy; j < ngy+ny; ++j) {
             // choose i range so that ii = i + (m-mid) stays inside [0, L.sx-1]
-            int i_start = std::max(ngx-1, mid);
-            int i_end = std::min(ngx+nx-1, L.sx - 1 - (stencil - 1 - mid));
-            for (int i = i_start; i <= i_end; ++i) {
+            for (int i = ngx - 1; i < ngx + nx; ++i) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
@@ -122,9 +123,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     // Y方向通量重构
     for (int k = ngz; k < ngz+nz; ++k) {
         for (int i = ngx; i < ngx+nx; ++i) {
-            int j_start = std::max(ngy-1, mid);
-            int j_end = std::min(ngy+ny-1, L.sy - 1 - (stencil - 1 - mid));
-            for (int j = j_start; j <= j_end; ++j) {
+            for (int j = ngy - 1; j < ngy + ny; ++j) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
@@ -167,9 +166,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     // Z方向通量重构
     for (int j = ngy; j < ngy+ny; ++j) {
         for (int i = ngx; i < ngx+nx; ++i) {
-            int k_start = std::max(ngz-1, mid);
-            int k_end = std::min(ngz+nz-1, L.sz - 1 - (stencil - 1 - mid));
-            for (int k = k_start; k <= k_end; ++k) {
+            for (int k = ngz; k < ngz + nz; ++k) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
@@ -212,44 +209,46 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
 }
 
 // Roe平均
-void computeRoeAveragedState(double &rho_bar, double &rhou_bar, double &rhov_bar, double &rhow_bar,
+void computeRoeAveragedState(double &rho_bar, double &u_bar, double &v_bar, double &w_bar,
                              double &h_bar, double &a_bar,
-                             const double Ul[5], const double Ur[5],
+                             const double ul[5], const double ur[5],
                              double gamma)
 {
     // 提取左状态变量
-    double rho_L = Ul[0];
-    double u_L = Ul[1] / rho_L;
-    double v_L = Ul[2] / rho_L;
-    double w_L = Ul[3] / rho_L;
-    double p_L = (gamma - 1.0) * (Ul[4] - 0.5 * rho_L * (u_L*u_L + v_L*v_L + w_L*w_L));
+    double rho_L = ul[0];
+    double u_L = ul[1];
+    double v_L = ul[2];
+    double w_L = ul[3];
+    double p_L = ul[4];
+    double E_L = rho_L * (0.5 * (u_L*u_L + v_L*v_L + w_L*w_L) + p_L / ((gamma - 1.0) * rho_L));
     // 提取右状态变量
-    double rho_R = Ur[0];
-    double u_R = Ur[1] / rho_R;
-    double v_R = Ur[2] / rho_R;
-    double w_R = Ur[3] / rho_R;
-    double p_R = (gamma - 1.0) * (Ur[4] - 0.5 * rho_R * (u_R*u_R + v_R*v_R + w_R*w_R));
+    double rho_R = ur[0];
+    double u_R = ur[1];
+    double v_R = ur[2];
+    double w_R = ur[3];
+    double p_R = ur[4];
+    double E_R = rho_R * (0.5 * (u_R*u_R + v_R*v_R + w_R*w_R) + p_R / ((gamma - 1.0) * rho_R));
 
     // 计算Roe平均态
     double sqrt_rho_L = std::sqrt(rho_L);
     double sqrt_rho_R = std::sqrt(rho_R);
     rho_bar = sqrt_rho_L * sqrt_rho_R;
     double denom = 1.0 / (sqrt_rho_L + sqrt_rho_R);
-    rhou_bar = (sqrt_rho_L * u_L + sqrt_rho_R * u_R) * denom;
-    rhov_bar = (sqrt_rho_L * v_L + sqrt_rho_R * v_R) * denom;
-    rhow_bar = (sqrt_rho_L * w_L + sqrt_rho_R * w_R) * denom;
+    u_bar = (sqrt_rho_L * u_L + sqrt_rho_R * u_R) * denom;
+    v_bar = (sqrt_rho_L * v_L + sqrt_rho_R * v_R) * denom;
+    w_bar = (sqrt_rho_L * w_L + sqrt_rho_R * w_R) * denom;
     // Total specific enthalpy H = (E + p) / rho. Here Ul[4] and Ur[4] are the total energy (conserved E).
-    double H_L = (Ul[4] + p_L) / rho_L;
-    double H_R = (Ur[4] + p_R) / rho_R;
+    double H_L = (E_L + p_L) / rho_L;
+    double H_R = (E_R + p_R) / rho_R;
     h_bar = (sqrt_rho_L * H_L + sqrt_rho_R * H_R) * denom;
-    double kinetic_bar = 0.5 * (rhou_bar*rhou_bar + rhov_bar*rhov_bar + rhow_bar*rhow_bar);
+    double kinetic_bar = 0.5 * (u_bar*u_bar + v_bar*v_bar + w_bar*w_bar);
     a_bar = std::sqrt((gamma - 1.0) * (h_bar - kinetic_bar));
 
 }
 
 // 计算左/右 特征向量矩阵 L (左) 与 R (右) 对任意法向量 (nx,ny,nz)
 // using Blazek-style formula from your snippet
-static void build_eigen_matrices(const double Ul[5], const double Ur[5],
+static void build_eigen_matrices(const double ul[5], const double ur[5],
                                  double nx, double ny, double nz,
                                  double gamma,
                                  double Lmat[5][5], double Rmat[5][5],
@@ -257,7 +256,7 @@ static void build_eigen_matrices(const double Ul[5], const double Ur[5],
 {
     // first compute Roe averaged quantities
     double rhobar, ubar, vbar, wbar, Hbar, abar, pbar;
-    computeRoeAveragedState(rhobar, ubar, vbar, wbar, Hbar, abar, Ul, Ur, gamma);
+    computeRoeAveragedState(rhobar, ubar, vbar, wbar, Hbar, abar, ul, ur, gamma);
 
     double V = nx * ubar + ny * vbar + nz * wbar;
     double c = abar;
@@ -393,20 +392,16 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
     // For a runtime stencil length `stencil`, pick the middle split as
     // mid = stencil/2, then left = mid-1, right = mid. This maps correctly
     // for even (e.g. 6 -> left=2,right=3) and odd (e.g. 5 -> left=1,right=2)
-    int mid = stencil / 2;
-    double Ul[VAR], Ur[VAR];
-    int ileft = std::max(0, mid - 1);
-    int iright = std::min(stencil - 1, mid);
-    for (int n = 0; n < VAR; ++n) { Ul[n] = Ut[n][ileft]; Ur[n] = Ut[n][iright]; }
-
-    // 3) compute Roe averaged eigenvectors and lambar
-    double Lmat[VAR][VAR], Rmat[VAR][VAR], lambar[VAR];
-    build_eigen_matrices(Ul, Ur, nx, ny, nz, gamma, Lmat, Rmat, lambar);
+    int mid = (stencil - 1) / 2;
+    double ul[VAR], ur[VAR];
+    int ileft = mid;
+    int iright = mid + 1;
+    for (int n = 0; n < VAR; ++n) { ul[n] = ut[n][ileft]; ur[n] = ut[n][iright]; }
 
     // 4) choose dissipation (lamdamax) per characteristic based on P.fvs_type:
     double lamdamax[VAR];
     switch (P.fvs_type) {
-        case SolverParams::FVS_Type::VanLeer: {
+        case SolverParams::FVS_Type::LaxFriedrichs: {
             // Global Lax-Friedrichs: choose a global max over stencil and components
             double gmax = 0.0;
             for (int m = 0; m < stencil; ++m)
@@ -414,7 +409,7 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
                     gmax = std::max(gmax, std::abs(lamda[n][m]));
             for (int n = 0; n < VAR; ++n) lamdamax[n] = gmax;
         } break;
-        case SolverParams::FVS_Type::LaxFriedrichs: {
+        case SolverParams::FVS_Type::Rusanov: {
             // Local Lax-Friedrichs: per-component max over stencil
             for (int n = 0; n < VAR; ++n) {
                 double mxx = 0.0;
@@ -422,17 +417,17 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
                 lamdamax[n] = mxx;
             }
         } break;
+        case SolverParams::FVS_Type::VanLeer: {
+            // Van Leer: not finished yet
+        } break;
         case SolverParams::FVS_Type::StegerWarming:
+        {
+            // Steger-Warming: not finished yet
+        } break;
         default: {
-            // Roe with entropy correction (approx)
-            for (int n = 0; n < VAR; ++n) {
-                // use the two entries adjacent to the interface (ileft, iright)
-                double diff1 = lambar[n] - lamda[n][ileft];
-                double diff2 = lamda[n][iright] - lambar[n];
-                double eps = 4.0 * std::max(std::max(diff1, diff2), 0.0);
-                if (std::abs(lambar[n]) < eps) lamdamax[n] = (lambar[n]*lambar[n] + eps*eps) / (2.0 * eps);
-                else lamdamax[n] = std::abs(lambar[n]);
-            }
+            // default to get error
+            std::cerr << "reconstructInviscidFlux: unknown FVS_Type\n";
+            return;
         } break;
     }
 
@@ -459,6 +454,10 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
     // Compute characteristic variables w = L * Ft  and LU = L * Ut (L is left-eig matrix)
     std::vector<std::vector<double>> wchar(VAR, std::vector<double>(stencil));
     std::vector<std::vector<double>> LU(VAR, std::vector<double>(stencil));
+    // 3) compute Roe averaged eigenvectors and lambar
+    double Lmat[VAR][VAR], Rmat[VAR][VAR], lambar[VAR];
+    build_eigen_matrices(ul, ur, nx, ny, nz, gamma, Lmat, Rmat, lambar);
+    std::cout << "characteric - wise has been called"<<std::endl;
     for (int m = 0; m < stencil; ++m) {
         for (int n = 0; n < VAR; ++n) {
             double sumw = 0.0, sumLU = 0.0;
