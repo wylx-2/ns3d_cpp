@@ -7,6 +7,12 @@
 #include <sstream>
 #include <iomanip>
 #include <filesystem>
+#include <cmath>
+#include <fftw3-mpi.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // tecplot 输出函数
 // Write local (per-rank) field data to a Tecplot ASCII file.
@@ -120,4 +126,3 @@ void write_residuals_tecplot(const Field3D &F, int step, const std::string &file
 	ofs.close();
 
 }
-

@@ -7,7 +7,7 @@ Usage:
     python3 merge_tecplot.py prefix output_filename
 
 Example:
-    python3 merge_tecplot.py field field_merged.dat
+    python3 ./tools/merge_tecplot.py ./output/initial_field intitial_field_merged.dat
 
 Notes:
 - Assumes per-rank files are named <prefix>_rank<id>.dat and contain the VARIABLES line

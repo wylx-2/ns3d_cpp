@@ -6,12 +6,14 @@
 #include <mpi.h>
 #include <iostream>
 #include <string>
+#include <complex>
+#include <fftw3-mpi.h>
+
 
 // 读取solver.in文件初始化参数
 bool read_solver_params_from_file(const std::string &fname, SolverParams &P, GridDesc &G, CartDecomp &C);
 
-// 初始化流场
-// 均匀场
+// 均匀场初始条件
 void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 2D Riemann 问题初始条件
@@ -21,9 +23,11 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
 void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 三维各向同均匀湍流初始条件
-void initialize_isotropic_turbulence_spectral(Field3D &F, const GridDesc &G, const SolverParams &P, const CartDecomp &C,
-                                              double u_rms_target = 1.0, double k0 = 5.0,
-                                              unsigned seed = 12345, double rho0 = 1.0, double p0 = 1.0);
+void generate_full_turbulence(int NX, int NY, int NZ,
+                              std::vector<double> &u,
+                              std::vector<double> &v,
+                              std::vector<double> &w);
+void init_isotropic_turbulence(Field3D &F, const GridDesc &G, const CartDecomp &C);
 
 // 边界条件处理函数
 void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);
@@ -115,9 +119,12 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 // If step==0 the file is overwritten and header is written; otherwise the line is appended.
 void write_residuals_tecplot(const Field3D &F, int step, const std::string &filename = "residuals.dat");
 
+// 计算能谱
+void compute_energy_spectrum(const Field3D &F, const GridDesc &G, const CartDecomp &C,
+                             const std::string &filename = "Energy-spectrum.dat");
+
 // compute diagnostics: rms of RHS, total energy, residual
 void compute_diagnostics(Field3D &F, const SolverParams &P, const GridDesc &G);
 
 // main time advance loop with monitor & output
 void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);
-

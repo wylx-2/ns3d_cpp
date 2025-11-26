@@ -63,6 +63,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
             std::stringstream ss;
             ss << "output_step_" << std::setw(5) << std::setfill('0') << step;
             write_tecplot_field(F, G, C, ss.str(), current_time);
+            compute_energy_spectrum(F, G, C, ss.str() + "_spectrum.dat");
         }
 
         if (current_time >= TotalTime) {

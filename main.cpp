@@ -22,11 +22,11 @@ int main(int argc, char** argv) {
     Field3D F; 
     F.allocate(L);
     // initialize_uniform_field(F, G, P);  // Initialize field
-    initialize_riemann_2d(F, G, P);
+    // initialize_riemann_2d(F, G, P);
     // initialize_sod_shock_tube(F, G, P);
     // isotropic turbulence initialization
     // bar_urms_target = 1.0, k0 = 5.0, seed = 12345, rho0 = 1.0, p0 = 1.0
-    // initialize_isotropic_turbulence_spectral(F, G, P, C, 1.0, 5.0, 12345, 1.0, 1.0);
+    init_isotropic_turbulence(F, G, C);
 
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange
     F.primitiveToConserved(P); // update primitive variables (including ghosts)
@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
     // output the initial field
     std::string prefix = "initial_field";
     write_tecplot_field(F, G, C, prefix, 0.0);
+    compute_energy_spectrum(F, G, C, prefix + "_spectrum.dat");
 
     // Main time-stepping loop
     time_advance(F, C, G, P);
