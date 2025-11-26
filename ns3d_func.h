@@ -41,16 +41,13 @@ inline void flux_euler(double rho, double u, double v, double w,
 /// 声速
 inline double sound_speed(double gamma, double p, double rho);
 
-/// Rusanov（Local Lax–Friedrichs）数值通量
-void rusanov_flux(const double *QL, const double *QR, double gamma, double *Fhat);
-
-// 简单的线性重构（标量，5 点模板）
+// 简单的线性重构（标量，2 点模板）
 double linear_reconstruction(const std::array<double,2> &stencil);
 
 // MDCD 重构（标量，6 点模板）
 double mdcd_reconstruction(const std::array<double,6>& stencil, SolverParams P);
 
-// WENO5 重构（标量，5 点模板）
+// WENO5 重构（标量，6 点模板）
 double weno5_reconstruction(const std::array<double,6> &stencil);
 
 // C6th 六阶中心差分重构（标量，6 点模板）
@@ -119,7 +116,7 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 void write_residuals_tecplot(const Field3D &F, int step, const std::string &filename = "residuals.dat");
 
 // compute diagnostics: rms of RHS, total energy, residual
-void compute_diagnostics(Field3D &F, const SolverParams &P);
+void compute_diagnostics(Field3D &F, const SolverParams &P, const GridDesc &G);
 
 // main time advance loop with monitor & output
 void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);

@@ -30,13 +30,15 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
             dt = TotalTime - current_time; // adjust last step to hit TotalTime
         }
         current_time += dt;
-
         // 三阶Runge–Kutta推进
         runge_kutta_3(F, C, G, P, out_reqs, dt);
+        if(C.rank == 0){
+            std::cout << "Completed step " << step << " / " << max_steps << ", Time = " << current_time << " / " << TotalTime << "\n";
+        }
 
         // 诊断与监控
         if (step % monitor_freq == 0 || step == 1) {
-            compute_diagnostics(F, P);
+            compute_diagnostics(F, P, G);
 
             double t_now = MPI_Wtime();
             double t_elapsed = t_now - t_start;
@@ -47,7 +49,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
                 std::cout << std::fixed << std::setprecision(6)
                           << "[Step " << step << "] "
                           << "dt=" << dt
-                          << "  E_avg=" << F.global_Etot/(F.L.nx*F.L.ny*F.L.nz)
+                          << "  E_avg=" << F.global_Etot
                           << "  Time/step=" << t_step << "s"
                           << "  Elapsed=" << t_elapsed << "s\n";
                 std::stringstream ss;

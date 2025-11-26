@@ -142,15 +142,19 @@ void runge_kutta_3(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, Halo
 // -----------------------------------------------------------------------------
 // 辅助函数：计算总能量、残差、RMS
 // -----------------------------------------------------------------------------
-void compute_diagnostics(Field3D &F, const SolverParams &P)
+void compute_diagnostics(Field3D &F, const SolverParams &P, const GridDesc &G)
 {
     const LocalDesc &L = F.L;
 	double sum_E = 0.0;
+    double dx = G.dx;
+    double dx3 = dx * dx * dx;
 	// per-variable accumulators for true residual calculation
     // double sum_abs_res_rho = 0.0, sum_abs_res_rhou = 0.0, sum_abs_res_rhov = 0.0, sum_abs_res_rhow = 0.0, sum_abs_res_E = 0.0;
     double sum_sq_res_rho = 0.0, sum_sq_res_rhou = 0.0, sum_sq_res_rhov = 0.0, sum_sq_res_rhow = 0.0, sum_sq_res_E = 0.0;
 	double max_abs_rho = 0.0, max_abs_rhou = 0.0, max_abs_rhov = 0.0, max_abs_rhow = 0.0, max_abs_E = 0.0;
     int count = 0;
+
+    F.updateResiduals();
 
     for (int k = L.ngz; k < L.ngz + L.nz; ++k)
     for (int j = L.ngy; j < L.ngy + L.ny; ++j)
@@ -168,7 +172,7 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
         // total energy
         double kinetic = 0.5 * rho * (u*u + v*v + w*w);
         double eint = p / (P.gamma - 1.0);
-        sum_E += kinetic + eint;
+        sum_E += (kinetic + eint)*dx3;
 
         // max absolute values for normalization
         max_abs_rho = std::max(max_abs_rho, std::abs(rho));
@@ -178,7 +182,7 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
         max_abs_E = std::max(max_abs_E, std::abs(E));
 
 		// residual
-        F.updateResiduals();
+    
         double res_rho = F.res_rho[id];;
         double res_rhou = F.res_rhou[id];
         double res_rhov = F.res_rhov[id];
@@ -192,14 +196,16 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
         sum_abs_res_rhow += std::abs(res_rhow);
         sum_abs_res_E += std::abs(res_E);
         */
+        
 
-		sum_sq_res_rho += res_rho * res_rho;
-        sum_sq_res_rhou += res_rhou * res_rhou;
-        sum_sq_res_rhov += res_rhov * res_rhov;
-        sum_sq_res_rhow += res_rhow * res_rhow;
-        sum_sq_res_E += res_E * res_E;
+		sum_sq_res_rho += res_rho * res_rho * dx3;
+        sum_sq_res_rhou += res_rhou * res_rhou * dx3;
+        sum_sq_res_rhov += res_rhov * res_rhov * dx3;
+        sum_sq_res_rhow += res_rhow * res_rhow * dx3;
+        sum_sq_res_E += res_E * res_E * dx3;
         ++count;
     }
+
 	// global reductions
     double g_E = 0.0;
     // double g_sum_abs_res_rho = 0.0, g_sum_abs_res_rhou = 0.0, g_sum_abs_res_rhov = 0.0, g_sum_abs_res_rhow = 0.0, g_sum_abs_res_E = 0.0;
@@ -231,10 +237,10 @@ void compute_diagnostics(Field3D &F, const SolverParams &P)
     // input diagnostics
     F.global_Etot = g_E;
     // residual = (g_sum_abs_res_rho / g_N) / g_max_abs_rho;
-    F.global_res_rho = std::sqrt( (g_sum_sq_res_rho / g_N) ) / g_max_abs_rho;
-    F.global_res_rhou = std::sqrt( (g_sum_sq_res_rhou / g_N) ) / g_max_abs_rhou;
-    F.global_res_rhov = std::sqrt( (g_sum_sq_res_rhov / g_N) ) / g_max_abs_rhov;
-    F.global_res_rhow = std::sqrt( (g_sum_sq_res_rhow / g_N) ) / g_max_abs_rhow;
-    F.global_res_E = std::sqrt( (g_sum_sq_res_E / g_N) ) / g_max_abs_E;
+    F.global_res_rho = std::sqrt( (g_sum_sq_res_rho ) ) / g_max_abs_rho;
+    F.global_res_rhou = std::sqrt( (g_sum_sq_res_rhou) ) / g_max_abs_rhou;
+    F.global_res_rhov = std::sqrt( (g_sum_sq_res_rhov) ) / g_max_abs_rhov;
+    F.global_res_rhow = std::sqrt( (g_sum_sq_res_rhow) ) / g_max_abs_rhow;
+    F.global_res_E = std::sqrt( (g_sum_sq_res_E) ) / g_max_abs_E;
 
 }
