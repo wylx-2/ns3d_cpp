@@ -15,18 +15,19 @@ int main(int argc, char** argv) {
     // initialize SolverParams
     read_solver_params_from_file("solver.in", P, G, C);
     build_cart_decomp(C);
+    std::cout << "bc set: " << C.periods[0] << "," << C.periods[1] << "," << C.periods[2] << "\n";
 
     LocalDesc L; 
     compute_local_desc(G, C, L, P.ghost_layers, P.ghost_layers, P.ghost_layers);
 
     Field3D F; 
     F.allocate(L);
-    // initialize_uniform_field(F, G, P);  // Initialize field
+    initialize_uniform_field(F, G, P);  // Initialize field
     // initialize_riemann_2d(F, G, P);
     // initialize_sod_shock_tube(F, G, P);
     // isotropic turbulence initialization
     // bar_urms_target = 1.0, k0 = 5.0, seed = 12345, rho0 = 1.0, p0 = 1.0
-    init_isotropic_turbulence(F, G, C);
+    // init_isotropic_turbulence(F, G, C);
 
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange
     F.primitiveToConserved(P); // update primitive variables (including ghosts)

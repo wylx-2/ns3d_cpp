@@ -166,7 +166,7 @@ void computeFVSFluxes(Field3D &F, const SolverParams &P)
     // Z方向通量重构
     for (int j = ngy; j < ngy+ny; ++j) {
         for (int i = ngx; i < ngx+nx; ++i) {
-            for (int k = ngz; k < ngz + nz; ++k) {
+            for (int k = ngz -1; k < ngz + nz; ++k) {
                 // dynamic 2D arrays: VAR x stencil
                 std::vector<std::vector<double>> Ft(VAR, std::vector<double>(stencil));
                 std::vector<std::vector<double>> Ut(VAR, std::vector<double>(stencil));
