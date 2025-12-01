@@ -99,6 +99,10 @@ bool read_solver_params_from_file(
         else if (k=="y0") G.y0 = std::stod(val);
         else if (k=="z0") G.z0 = std::stod(val);
 
+        else if (k=="Lx") G.Lx = std::stod(val);
+        else if (k=="Ly") G.Ly = std::stod(val);
+        else if (k=="Lz") G.Lz = std::stod(val);
+
         // ---- simulation control (allow several common key names) ----
         else if (k=="max_steps") P.max_steps = std::stoi(val);
         else if (k=="monitor_freq") P.monitor_freq = std::stoi(val);
@@ -136,9 +140,9 @@ bool read_solver_params_from_file(
     if (P.bc_zmin==SolverParams::BCType::Periodic &&
         P.bc_zmax==SolverParams::BCType::Periodic)
         C.periods[2] = 1;
-    G.dx = 1.0 / G.global_nx;
-    G.dy = 1.0 / G.global_ny;
-    G.dz = 1.0 / G.global_nz;
+    G.dx = G.Lx / G.global_nx;
+    G.dy = G.Ly / G.global_ny;
+    G.dz = G.Lz / G.global_nz;
 
     // 根据重构格式设置ghost层数和stencil大小
     switch (P.recon) {

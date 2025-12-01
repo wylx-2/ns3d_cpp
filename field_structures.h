@@ -31,6 +31,7 @@
 struct GridDesc {
     int global_nx = 0, global_ny = 0, global_nz = 0; // number of physical points (no ghost)
     double x0 = 0., y0 = 0., z0 = 0.;                // origin
+    double Lx = 1., Ly = 1., Lz = 1.;                // domain lengths
     double dx = 1., dy = 1., dz = 1.;                // grid spacing (uniform)
 };
 

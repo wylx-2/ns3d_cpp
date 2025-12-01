@@ -4,12 +4,12 @@
 
 # Physical parameters
 gamma       = 1.4
-mu          = 0.0
+mu          = 0.001
 Pr          = 0.71
 Rgas        = 287.058
 
 # Time stepping
-cfl         = 0.4
+cfl         = 0.5
 
 # Reconstruction and schemes
 fvs_type    = LaxFriedrichs     
@@ -22,26 +22,29 @@ mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 16
-global_ny   = 16
-global_nz   = 16
+global_nx   = 128
+global_ny   = 128
+global_nz   = 128
 
 # Boundary conditions
 # Periodic/Outflow/Wall/
-bc_xmin = Outflow
-bc_xmax = Outflow
-bc_ymin = Outflow
-bc_ymax = Outflow
-bc_zmin = Outflow
-bc_zmax = Outflow
+bc_xmin = Periodic
+bc_xmax = Periodic
+bc_ymin = Periodic
+bc_ymax = Periodic
+bc_zmin = Periodic
+bc_zmax = Periodic
 
 # Optional domain origin
 x0 = 0.0
 y0 = 0.0
 z0 = 0.0
+Lx = 2
+Ly = 2
+Lz = 2
 
 # simulation control
-max_steps = 1
-monitor_freq = 1
-output_freq = 5
+max_steps = 10000
+monitor_freq = 100
+output_freq = 500
 TotalTime = 10.0
