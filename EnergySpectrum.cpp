@@ -105,8 +105,9 @@ void compute_energy_spectrum_rank0(
     }
 
     // --- Shell-integrated energy spectrum ---
-    int Kmax = 2 * NX;
+    int Kmax =  NX / 2;
     std::vector<double> Ek(Kmax+1, 0.0);
+    std::vector<int> Nk(Kmax+1, 0);
 
     for(int k=0; k<NZ; k++)
     for(int j=0; j<NY; j++)
@@ -119,6 +120,13 @@ void compute_energy_spectrum_rank0(
         int kk = (int) std::sqrt(1.0*(k1*k1 + k2*k2 + k3*k3)) + 0.5;
         int id = (i*NY + j)*NZ + k;
         Ek[kk] += Er[id];
+        Nk[kk] += 1;
+    }
+
+    // 球壳积分后计算能谱需要继续归一化处理
+    for(int k=1; k<=Kmax; k++){
+        if(Nk[k] > 0)
+            Ek[k] = Ek[k] *2*PI*k*k / (Nk[k]);
     }
 
     // --- Output to file ---
