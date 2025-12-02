@@ -105,7 +105,7 @@ void compute_energy_spectrum_rank0(
     }
 
     // --- Shell-integrated energy spectrum ---
-    int Kmax =  NX / 2;
+    int Kmax =  NX * 2;
     std::vector<double> Ek(Kmax+1, 0.0);
     std::vector<int> Nk(Kmax+1, 0);
 
@@ -121,12 +121,6 @@ void compute_energy_spectrum_rank0(
         int id = (i*NY + j)*NZ + k;
         Ek[kk] += Er[id];
         Nk[kk] += 1;
-    }
-
-    // 球壳积分后计算能谱需要继续归一化处理
-    for(int k=1; k<=Kmax; k++){
-        if(Nk[k] > 0)
-            Ek[k] = Ek[k] *2*PI*k*k / (Nk[k]);
     }
 
     // --- Output to file ---
@@ -183,8 +177,8 @@ void compute_energy_spectrum(const Field3D &F,
         wall.resize(N);
     }
 
-    // 每个 rank 的数据在全局数组中的线性偏移
-    int base = (L.ox*NY + L.oy)*NZ + L.oz;
+    // 每个 rank 的数据在全局数组中的线性偏移（未直接使用）
+    // int base = (L.ox*NY + L.oy)*NZ + L.oz; // unused, removed
 
     // Gather 方式：每个 rank 用 MPI_Gatherv 的 trick：Rank 0 手动 MPI_Recv
     if (C.rank == 0)
@@ -198,7 +192,10 @@ void compute_energy_spectrum(const Field3D &F,
             int gy = L.oy + j;
             int gz = L.oz + k;
             int gid = (gx*NY + gy)*NZ + gz;
-            int lid = (i*L.ny + j)*L.nz + k;
+            // local linear index in the same ordering as extract_local_velocity:
+            // extract_local_velocity increments p in loops (k, j, i) so
+            // p = (k*ny + j)*nx + i
+            int lid = (k * L.ny + j) * L.nx + i;
 
             uall[gid] = u_loc[lid];
             vall[gid] = v_loc[lid];

@@ -22,9 +22,9 @@ mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 128
-global_ny   = 128
-global_nz   = 128
+global_nx   = 16
+global_ny   = 16
+global_nz   = 16
 
 # Boundary conditions
 # Periodic/Outflow/Wall/
@@ -44,7 +44,7 @@ Ly = 2
 Lz = 2
 
 # simulation control
-max_steps = 10000
-monitor_freq = 100
+max_steps = 100
+monitor_freq = 1
 output_freq = 500
 TotalTime = 10.0
