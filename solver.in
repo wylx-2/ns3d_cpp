@@ -2,11 +2,15 @@
 # Solver Parameter File
 # ============================
 
-# Physical parameters
-gamma       = 1.4
+# physical parameters
+Length_ref      = 1.0
+Density_ref     = 1.0
+Temperature_ref = 1.0
+Velocity_ref    = 1.0
 mu          = 0.001
+gamma       = 1.4
+Rgas        = 287.08
 Pr          = 0.71
-Rgas        = 287.058
 
 # Time stepping
 cfl         = 0.5
@@ -45,6 +49,23 @@ Lz = 2
 
 # simulation control
 max_steps = 100
-monitor_freq = 1
-output_freq = 500
+monitor_Septfreq = 1
+output_Timefreq = 500
 TotalTime = 10.0
+
+# Post-processing
+# Field
+Post_Density       = True
+Post_VelocityX     = True
+Post_VelocityY     = True
+Post_VelocityZ     = True
+Post_TotalEnergy   = True
+Post_TotalPressure = True
+Post_Temperature   = True
+# EnergySpectrum/Turbulence
+IsotropicAnalyse = True
+# monitor
+monitor_Res = False
+monitor_Energy = True
+monitor_CurrentTime = True
+monitor_TimeStep = True 

@@ -128,3 +128,6 @@ void compute_diagnostics(Field3D &F, const SolverParams &P, const GridDesc &G);
 
 // main time advance loop with monitor & output
 void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);
+
+// post-processing for isotropic turbulence
+void isotropic_post_process(Field3D &F, GridDesc &G, CartDecomp &C, const std::string &prefix);
