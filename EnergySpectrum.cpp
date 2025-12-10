@@ -132,6 +132,7 @@ void compute_energy_spectrum_rank0(
     fout.close();
 
     // --- Compute statistics (urms, integral length, Taylor scale) ---
+    /*
     double Ek1=0, Ek2=0;
     for(int k=1; k<=Kmax; k++){
         Ek1 += Ek[k];
@@ -146,6 +147,7 @@ void compute_energy_spectrum_rank0(
     std::cout << "urms = " << urms << "\n";
     std::cout << "Integral length scale le = " << le << "\n";
     std::cout << "Turnover time tau = " << tau << "\n";
+    */
 
     fftw_free(U); fftw_free(V); fftw_free(W);
 }
