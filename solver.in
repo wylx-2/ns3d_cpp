@@ -49,23 +49,15 @@ Lz = 2
 
 # simulation control
 max_steps = 100
-monitor_Septfreq = 1
-output_Timefreq = 500
+monitor_Stepfreq = 5
+output_Timefreq = 0.1
 TotalTime = 10.0
 
 # Post-processing
 # Field
-Post_Density       = True
-Post_VelocityX     = True
-Post_VelocityY     = True
-Post_VelocityZ     = True
-Post_TotalEnergy   = True
-Post_TotalPressure = True
-Post_Temperature   = True
+Post_BasicField       = True
 # EnergySpectrum/Turbulence
-IsotropicAnalyse = True
+IsotropicAnalyse      = True
 # monitor
-monitor_Res = False
-monitor_Energy = True
-monitor_CurrentTime = True
-monitor_TimeStep = True 
+monitor_Res           = True
+monitor_Energy        = True

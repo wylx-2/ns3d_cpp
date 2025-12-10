@@ -8,7 +8,9 @@
 #include <string>
 #include <complex>
 #include <fftw3-mpi.h>
-
+#include <iomanip>
+#include <fstream>
+#include <sstream>
 
 // 读取solver.in文件初始化参数
 bool read_solver_params_from_file(const std::string &fname, SolverParams &P, GridDesc &G, CartDecomp &C);
@@ -112,7 +114,7 @@ void compute_vis_flux(Field3D &F, const GridDesc &G);
 
 // Output full field in Tecplot ASCII format (per-rank file). Prefix will be used for filename: <prefix>_rank<id>.dat
 // time: physical time to label the output (optional, default 0.0)
-void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const std::string &prefix = "field", double time = 0.0);
+void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, const std::string &prefix = "field", double time = 0.0);
 
 // Write residuals (per-equation L2 residuals and total energy) vs time step to a Tecplot-like ASCII table.
 // The file will contain VARIABLES = "Step" "Res_rho" "Res_rhou" "Res_rhov" "Res_rhow" "Res_E" "Etot"
@@ -125,9 +127,18 @@ void compute_energy_spectrum(const Field3D &F, const GridDesc &G, const CartDeco
 
 // compute diagnostics: rms of RHS, total energy, residual
 void compute_diagnostics(Field3D &F, const SolverParams &P, const GridDesc &G);
+void compute_total_energy(Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P);
 
 // main time advance loop with monitor & output
 void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);
 
 // post-processing for isotropic turbulence
-void isotropic_post_process(Field3D &F, GridDesc &G, CartDecomp &C, const std::string &prefix);
+void isotropic_post_process(const Field3D &F, const GridDesc &G, const CartDecomp &C,const SolverParams &P, const double current_time);
+void compute_turbulence_statistics(const Field3D &F, const GridDesc &G, const SolverParams &P, const CartDecomp &C,
+                                   const double current_time);
+void compute_energy_spectrum_rank0(
+        int NX, int NY, int NZ,
+        const std::vector<double> &uall,
+        const std::vector<double> &vall,
+        const std::vector<double> &wall,
+        const std::string &filename);

@@ -126,7 +126,9 @@ void compute_energy_spectrum_rank0(
     // --- Output to file ---
     std::ofstream fout(filename);
     for(int k=0; k<=Kmax; k++)
+    {
         fout << k << " " << Ek[k] << "\n";
+    }
     fout.close();
 
     // --- Compute statistics (urms, integral length, Taylor scale) ---
@@ -250,7 +252,7 @@ void compute_energy_spectrum(const Field3D &F,
 
     // 3. Rank 0 计算能谱
     if (C.rank == 0){
-        compute_energy_spectrum_rank0(NX, NY, NZ, uall, vall, wall, "./output/" + filename);
+        compute_energy_spectrum_rank0(NX, NY, NZ, uall, vall, wall, filename);
         std::cout << "[Spectrum] Energy spectrum computed.\n";
     }
 }

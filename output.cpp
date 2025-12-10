@@ -18,7 +18,7 @@
 // Write local (per-rank) field data to a Tecplot ASCII file.
 // The file will contain a single structured ZONE with I=L.nx, J=L.ny, K=L.nz
 // and point-packed data. Coordinates are cell centers computed from GridDesc.
-void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const std::string &prefix, double time)
+void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, const std::string &prefix, double time)
 {
 	const LocalDesc &L = F.L;
 	int rank = C.rank;
@@ -41,9 +41,8 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 	}
 
 	ofs << "TITLE = \"NS3D Field Rank " << rank << "  Time=" << std::scientific << std::setprecision(8) << time << "\"\n";
-	ofs << "VARIABLES = \"X\" \"Y\" \"Z\" "
-		<< "\"rho\" \"rhou\" \"rhov\" \"rhow\" \"E\" "
-		<< "\"u\" \"v\" \"w\" \"p\" \"T\"\n";
+	ofs << "VARIABLES = \"X\" \"Y\" \"Z\" \"rho\" \"u\" \"v\" \"w\" \"E\" \"p\" \"T\"";
+	ofs << "\n";
 
 	// structured zone with local physical sizes
 	// include time in zone title so merged files can see the time per-zone
@@ -75,9 +74,10 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 				double p = F.p[gid];
 				double T = F.T[gid];
 
-				ofs << x << " " << y << " " << z << " "
-					<< rho << " " << rhou << " " << rhov << " " << rhow << " " << E << " "
-					<< u << " " << v << " " << w << " " << p << " " << T << "\n";
+				ofs << x << " " << y << " " << z << " " 
+					<< rho << " " << u << " " << v << " " 
+					<< w << " " << E << " " << p << " " << T;
+				ofs << "\n";
 			}
 		}
 	}

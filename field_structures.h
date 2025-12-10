@@ -130,26 +130,16 @@ struct SolverParams {
     // simulation control
     int max_steps = 1;
     int monitor_Stepfreq = 1;
-    int output_Timefreq = 1;
+    double output_Timefreq = 1.0;
     double TotalTime = 1.0;
-    double monitor_time = 1.0;
-    bool if_monitor = false;
 
     // output/post-processing flags
-    bool post_density = true;
-    bool post_velocityx = true;
-    bool post_velocityy = true;
-    bool post_velocityz = true;
-    bool post_totalenergy = true;
-    bool post_totalpressure = true;
-    bool post_temperature = true;
+    bool post_basicfield = true;
     bool isotropic_analyse = true;
 
     // monitor switches
     bool monitor_res = true;
     bool monitor_energy = true;
-    bool monitor_current_time = true;
-    bool monitor_time_step = true;
 };
 
 // --------------------------- Halo exchange requests --------------------------

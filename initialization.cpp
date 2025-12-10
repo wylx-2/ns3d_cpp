@@ -111,8 +111,8 @@ bool read_solver_params_from_file(
 
         // ---- simulation control (allow several common key names) ----
         else if (k=="max_steps") P.max_steps = std::stoi(val);
-        else if (k=="monitor_Stepfreq") P.monitor_Stepfreq = std::stoi(val);
-        else if (k=="output_Timefreq") P.output_Timefreq = std::stoi(val);
+        else if (k=="monitor_stepfreq") P.monitor_Stepfreq = std::stoi(val);
+        else if (k=="output_timefreq") P.output_Timefreq = std::stod(val);
         else if (k=="totaltime") P.TotalTime = std::stod(val);
 
         // ---- 边界条件 ----
@@ -132,18 +132,10 @@ bool read_solver_params_from_file(
         else if (k=="bc_zmax") P.bc_zmax = parse_bc(v);
 
         // ---- post-processing / monitor flags ----
-        else if (k=="post_density") P.post_density = parse_bool(val);
-        else if (k=="post_velocityx") P.post_velocityx = parse_bool(val);
-        else if (k=="post_velocityy") P.post_velocityy = parse_bool(val);
-        else if (k=="post_velocityz") P.post_velocityz = parse_bool(val);
-        else if (k=="post_totalenergy") P.post_totalenergy = parse_bool(val);
-        else if (k=="post_totalpressure") P.post_totalpressure = parse_bool(val);
-        else if (k=="post_temperature") P.post_temperature = parse_bool(val);
+        else if (k=="post_basicfield") P.post_basicfield = parse_bool(val);
         else if (k=="isotropicanalyse") P.isotropic_analyse = parse_bool(val);
         else if (k=="monitor_res") P.monitor_res = parse_bool(val);
         else if (k=="monitor_energy") P.monitor_energy = parse_bool(val);
-        else if (k=="monitor_currenttime") P.monitor_current_time = parse_bool(val);
-        else if (k=="monitor_timestep") P.monitor_time_step = parse_bool(val);
     }
 
     fin.close();

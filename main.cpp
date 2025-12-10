@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
 
     // output the initial field
     std::string prefix = "initial_field";
-    write_tecplot_field(F, G, C, prefix, 0.0);
+    write_tecplot_field(F, G, C, P, prefix, 0.0);
     compute_energy_spectrum(F, G, C, prefix + "_spectrum.dat");
 
     // Main time-stepping loop
@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
 
     // output the final field
     prefix = "final_field";
-    write_tecplot_field(F, G, C, prefix, P.TotalTime);
+    write_tecplot_field(F, G, C, P, prefix, P.TotalTime);
     MPI_Finalize();
     return 0;
 }
