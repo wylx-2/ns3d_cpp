@@ -79,7 +79,6 @@ bool read_solver_params_from_file(
             else if (v=="laxfriedrichs") P.fvs_type = SolverParams::FVS_Type::LaxFriedrichs;
         }
         else if (k=="recon") {
-            std::cout << "recon=" << v << std::endl;
             if (v=="mdcd") P.recon = SolverParams::Reconstruction::MDCD;
             else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
             else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
@@ -89,7 +88,6 @@ bool read_solver_params_from_file(
             else if (v=="c6") P.vis_scheme = SolverParams::ViscousScheme::C6th;
         }
         else if (k=="char_recon") {
-            std::cout << "char_recon=" << v << std::endl;
             P.char_recon = (v=="yes" || v=="true");
         }
         

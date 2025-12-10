@@ -10,6 +10,9 @@ struct TurbStats {
     double dissipation = 0.0;      // ε
     double u_rms = 0.0;            // rms velocity
     double taylor = 0.0;           // Taylor microscale λ
+    double taylor_Li = 0.0;        // Taylor-scale by Li Xinliang
+    double Re_lambda = 0.0;        // Reynolds number based on Taylor scale
+    double Mach_t = 0.0;           // Turbulent Mach number
     double eta = 0.0;              // Kolmogorov scale
     double u_eta = 0.0;            // Kolmogorov velocity
     double tau_eta = 0.0;          // Kolmogorov time scale
@@ -187,13 +190,13 @@ void compute_correlations_fftw(Field3D &F, GridDesc &G, CartDecomp &C,
 // -------------------------------------------------------------
 // Main postprocess function
 // -------------------------------------------------------------
-void compute_turbulence_statistics(const Field3D &F,
+void compute_turbulence_statistics(Field3D &F,
                                    const GridDesc &G,
                                    const SolverParams &P,
                                    const CartDecomp &C,
                                    const double current_time)
 {
-    double nu = P.mu;
+    double nu = P.mu/1.0; // assume rho=1.0
     TurbStats stats;
 
     // -------- 1. Compute spectrum (already done before) --------
@@ -219,9 +222,12 @@ void compute_turbulence_statistics(const Field3D &F,
     // -------- 2. Compute kinetic energy and RMS --------
     double local_energy=0, global_energy=0;
     double local_urms2=0, global_urms2=0;
+    double local_sound_speed=0, global_sound_speed=0;
+    double local_dudx2=0, global_dudx2=0;
 
     {
         const LocalDesc &L = F.L;
+        compute_gradients_dudx(F, G);
         for (int k=0;k<L.nz;k++)
         for (int j=0;j<L.ny;j++)
         for (int i=0;i<L.nx;i++)
@@ -230,17 +236,24 @@ void compute_turbulence_statistics(const Field3D &F,
             double uu=F.u[id], vv=F.v[id], ww=F.w[id];
             local_energy += 0.5*(uu*uu + vv*vv + ww*ww);
             local_urms2 += (uu*uu + vv*vv + ww*ww);
+            local_dudx2 += F.du_dx[id]*F.du_dx[id];
+            local_sound_speed += std::sqrt(P.gamma * P.Rgas * F.T[id]);
         }
     }
 
     MPI_Reduce(&local_energy,&global_energy,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
     MPI_Reduce(&local_urms2,&global_urms2,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
+    MPI_Reduce(&local_dudx2,&global_dudx2,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
+    MPI_Reduce(&local_sound_speed,&global_sound_speed,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
 
     if (C.rank==0)
     {
         int N = G.global_nx * G.global_ny * G.global_nz;
         stats.kinetic_energy = global_energy / double(N);
         stats.u_rms = std::sqrt(global_urms2 / double(3*N));
+        stats.taylor_Li = stats.u_rms / std::sqrt(global_dudx2 / double(N));
+        stats.Mach_t = std::sqrt(stats.kinetic_energy*2) / (global_sound_speed / double(N));
+        stats.Re_lambda = stats.u_rms * stats.taylor_Li / nu;
     }
 
     // -------- 3. Dissipation ε = 2 ν ∑ k² E(k) --------
@@ -272,7 +285,7 @@ void compute_turbulence_statistics(const Field3D &F,
         }
         if (!exists) {
             fout << "current_time " << "Kinetic Energy " << "u_rms " << "Dissipation " << "Taylor " << "Kol_scale "
-                 << "Kol_vel " << "Kol_time\n";
+                 << "Kol_vel " << "Kol_time " << "Taylor_Li " << "Re_lambda " << "Mach_t\n";
         }
         fout << current_time << " "
              << stats.kinetic_energy << " "
@@ -281,7 +294,10 @@ void compute_turbulence_statistics(const Field3D &F,
              << stats.taylor << " "
              << stats.eta << " "
              << stats.u_eta << " "
-             << stats.tau_eta << "\n";
+             << stats.tau_eta << " "
+             << stats.taylor_Li << " "
+             << stats.Re_lambda << " "
+             << stats.Mach_t << "\n";
     }
 
     /*

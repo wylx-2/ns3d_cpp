@@ -59,7 +59,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
                 std::cout << "dt=" << dt << "  Time/step=" << t_step << "s  Elapsed=" << t_elapsed << "s";
                 std::cout << "  Time=" << current_time << "/" << TotalTime;
                 if (P.monitor_energy) {
-                    std::cout << "  E_avg=" << F.global_Etot;
+                    std::cout << "  Ek_avg=" << F.global_Etot;
                 }
                 std::cout << "\n";
                 if (P.monitor_res) {

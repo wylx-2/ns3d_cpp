@@ -2,6 +2,7 @@
 #include "field_structures.h"
 #include <mpi.h>
 #include <algorithm>
+#include <iostream>
 // -----------------------------------------------------------------
 // ---------   计算粘性通量模块 -------------------------------------
 // -----------------------------------------------------------------   
@@ -47,40 +48,58 @@ inline int choose_scheme(int idx, int nstart, int nend, bool periodic)
         return 6; // 6th order central for inner points
 }
 
-inline double diff_x(const std::vector<double> &f, int i, double dx, int order_x)
+inline double diff_x(const std::vector<double> &f, int i, int j, int k, double dx, int order_x, const LocalDesc &L)
 {
+    std::vector<double> dummy(7);
+    for (int ii = 0; ii < 7; ++ii) 
+    {
+        dummy[ii] = f[idx3(i + ii - 3, j, k, L)];
+    }
+
     if (order_x == 1 || order_x == -1)
-        return diff_2nd_forward(f, i, dx, order_x);
+        return diff_2nd_forward(dummy, 3, dx, order_x);
     else if (order_x == 2)
-        return diff_2nd_central(f, i, dx);
+        return diff_2nd_central(dummy, 3, dx);
     else if (order_x == 4)
-        return diff_4th_central(f, i, dx);
+        return diff_4th_central(dummy, 3, dx);
     else
-        return diff_6th_central(f, i, dx);
+        return diff_6th_central(dummy, 3, dx);
 }
 
-inline double diff_y(const std::vector<double> &f, int j, double dy, int order_y)
+inline double diff_y(const std::vector<double> &f, int i, int j, int k, double dy, int order_y, const LocalDesc &L)
 {
+    std::vector<double> dummy(7);
+    for (int jj = 0; jj < 7; ++jj)
+    {
+        dummy[jj] = f[idx3(i, j + jj - 3, k, L)];
+    }
+
     if (order_y == 1 || order_y == -1)
-        return diff_2nd_forward(f, j, dy, order_y);
+        return diff_2nd_forward(dummy, 3, dy, order_y);
     else if (order_y == 2)
-        return diff_2nd_central(f, j, dy);
+        return diff_2nd_central(dummy, 3, dy);
     else if (order_y == 4)
-        return diff_4th_central(f, j, dy);
+        return diff_4th_central(dummy, 3, dy);
     else
-        return diff_6th_central(f, j, dy);
+        return diff_6th_central(dummy, 3, dy);
 }
 
-inline double diff_z(const std::vector<double> &f, int k, double dz, int order_z)
+inline double diff_z(const std::vector<double> &f, int i, int j, int k, double dz, int order_z, const LocalDesc &L)
 {
+    std::vector<double> dummy(7);
+    for (int kk = 0; kk < 7; ++kk)
+    {
+        dummy[kk] = f[idx3(i, j, k + kk - 3, L)];
+    }
+
     if (order_z == 1 || order_z == -1)
-        return diff_2nd_forward(f, k, dz, order_z);
+        return diff_2nd_forward(dummy, 3, dz, order_z);
     else if (order_z == 2)
-        return diff_2nd_central(f, k, dz);
+        return diff_2nd_central(dummy, 3, dz);
     else if (order_z == 4)
-        return diff_4th_central(f, k, dz);
+        return diff_4th_central(dummy, 3, dz);
     else
-        return diff_6th_central(f, k, dz);
+        return diff_6th_central(dummy, 3, dz);
 }
 // ==================================================
 // 主函数：自适应阶数梯度计算, 根据边界距离选择差分格式
@@ -93,7 +112,7 @@ void compute_gradients(Field3D &F, const GridDesc &G)
     int nx=L.nx, ny=L.ny, nz=L.nz;
     int ngx=L.ngx, ngy=L.ngy, ngz=L.ngz;
 
-    // 周期判断存在错误
+    // 周期判断
     bool periodic_x = (L.nbr_xm != MPI_PROC_NULL && L.nbr_xp != MPI_PROC_NULL);
     bool periodic_y = (L.nbr_ym != MPI_PROC_NULL && L.nbr_yp != MPI_PROC_NULL);
     bool periodic_z = (L.nbr_zm != MPI_PROC_NULL && L.nbr_zp != MPI_PROC_NULL);
@@ -109,21 +128,21 @@ void compute_gradients(Field3D &F, const GridDesc &G)
         int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z);
 
         // Compute gradients
-        F.du_dx[id] = diff_x(F.u, i, dx, order_x);
-        F.du_dy[id] = diff_y(F.u, j, dy, order_y);
-        F.du_dz[id] = diff_z(F.u, k, dz, order_z);
+        F.du_dx[id] = diff_x(F.u, i, j, k, dx, order_x, L);
+        F.du_dy[id] = diff_y(F.u, i, j, k, dy, order_y, L);
+        F.du_dz[id] = diff_z(F.u, i, j, k, dz, order_z, L);
 
-        F.dv_dx[id] = diff_x(F.v, i, dx, order_x);
-        F.dv_dy[id] = diff_y(F.v, j, dy, order_y);
-        F.dv_dz[id] = diff_z(F.v, k, dz, order_z);
+        F.dv_dx[id] = diff_x(F.v, i, j, k, dx, order_x, L);
+        F.dv_dy[id] = diff_y(F.v, i, j, k, dy, order_y, L);
+        F.dv_dz[id] = diff_z(F.v, i, j, k, dz, order_z, L);
 
-        F.dw_dx[id] = diff_x(F.w, i, dx, order_x);
-        F.dw_dy[id] = diff_y(F.w, j, dy, order_y);
-        F.dw_dz[id] = diff_z(F.w, k, dz, order_z);
+        F.dw_dx[id] = diff_x(F.w, i, j, k, dx, order_x, L);
+        F.dw_dy[id] = diff_y(F.w, i, j, k, dy, order_y, L);
+        F.dw_dz[id] = diff_z(F.w, i, j, k, dz, order_z, L);
 
-        F.dT_dx[id] = diff_x(F.T, i, dx, order_x);
-        F.dT_dy[id] = diff_y(F.T, j, dy, order_y);
-        F.dT_dz[id] = diff_z(F.T, k, dz, order_z);
+        F.dT_dx[id] = diff_x(F.T, i, j, k, dx, order_x, L);
+        F.dT_dy[id] = diff_y(F.T, i, j, k, dy, order_y, L);
+        F.dT_dz[id] = diff_z(F.T, i, j, k, dz, order_z, L);
     }
 }
 
@@ -209,24 +228,47 @@ void compute_vis_flux(Field3D &F, const GridDesc &G)
         int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z);
 
         // Compute viscous flux gradients
-        F.rhs_rho[id] += diff_x(F.Fvflux_mass, i, dx, order_x);
-        F.rhs_rho[id] += diff_y(F.Hvflux_mass, j, dy, order_y);
-        F.rhs_rho[id] += diff_z(F.Gvflux_mass, k, dz, order_z);
+        F.rhs_rho[id] += diff_x(F.Fvflux_mass, i, j, k, dx, order_x, L);
+        F.rhs_rho[id] += diff_y(F.Hvflux_mass, i, j, k, dy, order_y, L);
+        F.rhs_rho[id] += diff_z(F.Gvflux_mass, i, j, k, dz, order_z, L);
 
-        F.rhs_rhou[id] += diff_x(F.Fvflux_momx, i, dx, order_x);
-        F.rhs_rhou[id] += diff_y(F.Hvflux_momx, j, dy, order_y);
-        F.rhs_rhou[id] += diff_z(F.Gvflux_momx, k, dz, order_z);
+        F.rhs_rhou[id] += diff_x(F.Fvflux_momx, i, j, k, dx, order_x, L);
+        F.rhs_rhou[id] += diff_y(F.Hvflux_momx, i, j, k, dy, order_y, L);
+        F.rhs_rhou[id] += diff_z(F.Gvflux_momx, i, j, k, dz, order_z, L);
 
-        F.rhs_rhov[id] += diff_x(F.Fvflux_momy, i, dx, order_x);
-        F.rhs_rhov[id] += diff_y(F.Hvflux_momy, j, dy, order_y);
-        F.rhs_rhov[id] += diff_z(F.Gvflux_momy, k, dz, order_z);
+        F.rhs_rhov[id] += diff_x(F.Fvflux_momy, i, j, k, dx, order_x, L);
+        F.rhs_rhov[id] += diff_y(F.Hvflux_momy, i, j, k, dy, order_y, L);
+        F.rhs_rhov[id] += diff_z(F.Gvflux_momy, i, j, k, dz, order_z, L);
 
-        F.rhs_rhow[id] += diff_x(F.Fvflux_momz, i, dx, order_x);
-        F.rhs_rhow[id] += diff_y(F.Hvflux_momz, j, dy, order_y);
-        F.rhs_rhow[id] += diff_z(F.Gvflux_momz, k, dz, order_z);
+        F.rhs_rhow[id] += diff_x(F.Fvflux_momz, i, j, k, dx, order_x, L);
+        F.rhs_rhow[id] += diff_y(F.Hvflux_momz, i, j, k, dy, order_y, L);
+        F.rhs_rhow[id] += diff_z(F.Gvflux_momz, i, j, k, dz, order_z, L);
 
-        F.rhs_E[id] += diff_x(F.Fvflux_E, i, dx, order_x);
-        F.rhs_E[id] += diff_y(F.Hvflux_E, j, dy, order_y);
-        F.rhs_E[id] += diff_z(F.Gvflux_E, k, dz, order_z);
+        F.rhs_E[id] += diff_x(F.Fvflux_E, i, j, k, dx, order_x, L);
+        F.rhs_E[id] += diff_y(F.Hvflux_E, i, j, k, dy, order_y, L);
+        F.rhs_E[id] += diff_z(F.Gvflux_E, i, j, k, dz, order_z, L);
+    }
+}
+
+// function to compute only du/dx for isotropic turbulence analysis
+void compute_gradients_dudx(Field3D &F, const GridDesc &G)
+{
+    const LocalDesc &L = F.L;
+    const double dx = G.dx, dy = G.dy, dz = G.dz;
+    int nx=L.nx, ny=L.ny, nz=L.nz;
+    int ngx=L.ngx, ngy=L.ngy, ngz=L.ngz;
+
+    // 周期判断
+    bool periodic_x = (L.nbr_xm != MPI_PROC_NULL && L.nbr_xp != MPI_PROC_NULL);
+
+    for (int k = ngz; k < ngz+nz; ++k)
+    for (int j = ngy; j < ngy+ny; ++j)
+    for (int i = ngx; i < ngx+nx; ++i)
+    {
+        int id = F.I(i,j,k);
+        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x);
+        
+        // Compute gradients
+        F.du_dx[id] = diff_x(F.u, i, j, k, dx, order_x, L);
     }
 }

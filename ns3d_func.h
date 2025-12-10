@@ -133,8 +133,8 @@ void compute_total_energy(Field3D &F, const GridDesc &G, const CartDecomp &C, co
 void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P);
 
 // post-processing for isotropic turbulence
-void isotropic_post_process(const Field3D &F, const GridDesc &G, const CartDecomp &C,const SolverParams &P, const double current_time);
-void compute_turbulence_statistics(const Field3D &F, const GridDesc &G, const SolverParams &P, const CartDecomp &C,
+void isotropic_post_process(Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, const double current_time);
+void compute_turbulence_statistics(Field3D &F, const GridDesc &G, const SolverParams &P, const CartDecomp &C,
                                    const double current_time);
 void compute_energy_spectrum_rank0(
         int NX, int NY, int NZ,
@@ -142,3 +142,5 @@ void compute_energy_spectrum_rank0(
         const std::vector<double> &vall,
         const std::vector<double> &wall,
         const std::string &filename);
+// compute dudx gradients用于湍流统计
+void compute_gradients_dudx(Field3D &F, const GridDesc &G);

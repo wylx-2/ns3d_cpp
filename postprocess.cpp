@@ -117,7 +117,8 @@ void compute_total_energy(Field3D &F, const GridDesc &G, const CartDecomp &C, co
         double p = F.p[id];
 
         double kinetic = 0.5 * rho * (u*u + v*v + w*w);
-        double eint = p / (P.gamma - 1.0);
+        // double eint = p / (P.gamma - 1.0);
+        double eint = 0;
         local_sum += (kinetic + eint) * cell_vol;
     }
 
@@ -129,7 +130,7 @@ void compute_total_energy(Field3D &F, const GridDesc &G, const CartDecomp &C, co
 // -----------------------------------------------------------------------------
 // 各向同性湍流后处理函数
 // -----------------------------------------------------------------------------
-void isotropic_post_process(const Field3D &F, const GridDesc &G, const CartDecomp &C,const SolverParams &P, const double current_time)
+void isotropic_post_process(Field3D &F, const GridDesc &G, const CartDecomp &C,const SolverParams &P, const double current_time)
 {
     // 计算并输出能量谱
     std::stringstream ss;

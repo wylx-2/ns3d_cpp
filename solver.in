@@ -7,7 +7,7 @@ Length_ref      = 1.0
 Density_ref     = 1.0
 Temperature_ref = 1.0
 Velocity_ref    = 1.0
-mu          = 0.001
+mu          = 0.00025
 gamma       = 1.4
 Rgas        = 287.08
 Pr          = 0.71
@@ -26,9 +26,9 @@ mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 16
-global_ny   = 16
-global_nz   = 16
+global_nx   = 64
+global_ny   = 64
+global_nz   = 64
 
 # Boundary conditions
 # Periodic/Outflow/Wall/
@@ -43,14 +43,14 @@ bc_zmax = Periodic
 x0 = 0.0
 y0 = 0.0
 z0 = 0.0
-Lx = 2
-Ly = 2
-Lz = 2
+Lx = 6.283185307179586
+Ly = 6.283185307179586
+Lz = 6.283185307179586
 
 # simulation control
 max_steps = 100
-monitor_Stepfreq = 5
-output_Timefreq = 0.1
+monitor_Stepfreq = 10
+output_Timefreq = 1.0
 TotalTime = 10.0
 
 # Post-processing
@@ -59,5 +59,5 @@ Post_BasicField       = True
 # EnergySpectrum/Turbulence
 IsotropicAnalyse      = True
 # monitor
-monitor_Res           = True
+monitor_Res           = False
 monitor_Energy        = True
