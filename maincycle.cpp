@@ -76,9 +76,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
         // 输出流场文件
         if (if_output) {
             if(P.post_basicfield) {
-                std::stringstream ss;
-                ss << "output/field_rank" << std::setw(4) << std::setfill('0') << C.rank;
-                write_tecplot_field(F, G, C, P, ss.str(), current_time);
+                write_tecplot_field(F, G, C, P, current_time);
             }
             if (P.isotropic_analyse) {
                 isotropic_post_process(F, G, C, P, current_time);

@@ -64,16 +64,14 @@ int main(int argc, char** argv) {
         std::cout << "Initialization + halo exchange done\n";
 
     // output the initial field
-    std::string prefix = "initial_field";
-    write_tecplot_field(F, G, C, P, prefix, 0.0);
-    compute_energy_spectrum(F, G, C, prefix + "_spectrum.dat");
+    write_tecplot_field(F, G, C, P, 0.0);
+    if(P.isotropic_analyse) compute_energy_spectrum(F, G, C, "initial_spectrum.dat");
 
     // Main time-stepping loop
     time_advance(F, C, G, P);
 
     // output the final field
-    prefix = "final_field";
-    write_tecplot_field(F, G, C, P, prefix, P.TotalTime);
+    write_tecplot_field(F, G, C, P, P.TotalTime);
     MPI_Finalize();
     return 0;
 }

@@ -287,7 +287,8 @@ void compute_turbulence_statistics(Field3D &F,
             fout << "current_time " << "Kinetic Energy " << "u_rms " << "Dissipation " << "Taylor " << "Kol_scale "
                  << "Kol_vel " << "Kol_time " << "Taylor_Li " << "Re_lambda " << "Mach_t\n";
         }
-        fout << current_time << " "
+        fout << std::scientific << std::setprecision(8)
+             << current_time << " "
              << stats.kinetic_energy << " "
              << stats.u_rms << " "
              << stats.dissipation << " "

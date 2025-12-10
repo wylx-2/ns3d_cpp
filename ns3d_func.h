@@ -114,7 +114,7 @@ void compute_vis_flux(Field3D &F, const GridDesc &G);
 
 // Output full field in Tecplot ASCII format (per-rank file). Prefix will be used for filename: <prefix>_rank<id>.dat
 // time: physical time to label the output (optional, default 0.0)
-void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, const std::string &prefix = "field", double time = 0.0);
+void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, double time = 0.0);
 
 // Write residuals (per-equation L2 residuals and total energy) vs time step to a Tecplot-like ASCII table.
 // The file will contain VARIABLES = "Step" "Res_rho" "Res_rhou" "Res_rhov" "Res_rhow" "Res_E" "Etot"

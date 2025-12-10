@@ -18,25 +18,25 @@
 // Write local (per-rank) field data to a Tecplot ASCII file.
 // The file will contain a single structured ZONE with I=L.nx, J=L.ny, K=L.nz
 // and point-packed data. Coordinates are cell centers computed from GridDesc.
-void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, const std::string &prefix, double time)
+void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P, double time)
 {
 	const LocalDesc &L = F.L;
 	int rank = C.rank;
 
 	// ensure output directory exists
 	std::filesystem::path outdir("output");
+	std::filesystem::path timedir = outdir / ("time_" + std::to_string(static_cast<int>(time * 100000)));
 	std::error_code ec;
-	std::filesystem::create_directories(outdir, ec);
+	std::filesystem::create_directories(timedir, ec);
 	if (ec) {
 		std::cerr << "Warning: could not create output directory 'output': " << ec.message() << "\n";
 	}
 
 	std::ostringstream ss;
-	ss << prefix << "_rank" << rank << ".dat";
-	std::filesystem::path filepath = outdir / ss.str();
-	std::ofstream ofs(filepath.string());
+	ss << timedir.string() << "/field" << "_rank" << rank << ".dat";
+	std::ofstream ofs(ss.str());
 	if (!ofs) {
-		std::cerr << "Failed to open output file " << filepath.string() << " for writing\n";
+		std::cerr << "Failed to open output file " << ss.str() << " for writing\n";
 		return;
 	}
 
@@ -83,7 +83,7 @@ void write_tecplot_field(const Field3D &F, const GridDesc &G, const CartDecomp &
 	}
 
 	ofs.close();
-	std::cerr << "Wrote Tecplot file: " << filepath.string() << " (rank " << rank << ", time=" << std::scientific << std::setprecision(8) << time << ")\n";
+	std::cerr << "Wrote Tecplot file: " << ss.str() << " (rank " << rank << ", time=" << std::scientific << std::setprecision(8) << time << ")\n";
 }
 
 

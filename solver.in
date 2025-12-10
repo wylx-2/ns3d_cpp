@@ -50,7 +50,7 @@ Lz = 6.283185307179586
 # simulation control
 max_steps = 100
 monitor_Stepfreq = 10
-output_Timefreq = 1.0
+output_Timefreq = 0.01
 TotalTime = 10.0
 
 # Post-processing
