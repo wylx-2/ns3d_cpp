@@ -13,19 +13,28 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
     int monitor_Stepfreq = P.monitor_Stepfreq;
     double output_Timefreq = P.output_Timefreq;
     double TotalTime = P.TotalTime;
-    double dt = P.dt_fixed;
-    
     HaloRequests out_reqs;
 
     for (int step = 1; step <= max_steps; ++step)
     {
+        double dt = P.dt_fixed;
         // record conserved variables at current step
         F.recordConservedTo0();
 
+        const double eps = 1e-12;
+        if (std::abs(TotalTime - current_time) <= eps) {
+            break; // already at or beyond target time
+        }
+
         // 计算时间步长
-        if (P.dt_fixed < 0.0) double dt = compute_timestep(F, G, P);
+        if (P.dt_fixed < 0.0) dt = compute_timestep(F, G, P);
    
         bool if_output = false;
+        if (current_time >= output_Timefreq - eps) {
+            // already reached the scheduled output time; advance schedule first
+            if_output = true;
+            output_Timefreq += P.output_Timefreq;
+        }
         if (current_time + dt > TotalTime) {
             dt = TotalTime - current_time; // adjust last step to hit TotalTime
         }
@@ -33,6 +42,13 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
             dt = output_Timefreq - current_time; // adjust to hit output time
             output_Timefreq += P.output_Timefreq;
             if_output = true;
+        }
+        if (dt <= eps) {
+            if (C.rank == 0) {
+                std::cerr << "dt too small or zero; aborting to avoid stall at Time="
+                          << current_time << "\n";
+            }
+            break;
         }
         current_time += dt;
         

@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
             case SolverParams::FVS_Type::Rusanov: std::cout << "Rusanov\n"; break;
             case SolverParams::FVS_Type::VanLeer: std::cout << "Van Leer\n"; break;
         }
-        std::cout << "  CFL: " << P.cfl << "\n";
+        std::cout << "  CFL: " << P.cfl << " dt_fixed: " << P.dt_fixed << "\n";
         std::cout << "  if char_recon: " << (P.char_recon ? "true" : "false") << "\n";
         std::cout << "  Reconstruction: ";
         switch (P.recon) {

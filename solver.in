@@ -13,7 +13,7 @@ gamma       = 1.4
 Pr          = 0.71
 
 # Time stepping
-cfl         = 0.3
+cfl         = 0.1
 dt_fixed    = 0.0005
 
 # Reconstruction and schemes
@@ -49,8 +49,8 @@ Ly = 6.283185307179586
 Lz = 6.283185307179586
 
 # simulation control
-max_steps = 10000
-monitor_Stepfreq = 10
+max_steps = 100000
+monitor_Stepfreq = 100
 output_Timefreq = 0.1
 TotalTime = 5.0
 
