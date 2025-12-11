@@ -18,6 +18,9 @@ bool read_solver_params_from_file(const std::string &fname, SolverParams &P, Gri
 // 均匀场初始条件
 void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams &P);
 
+// 正弦波初始条件
+void initialize_sine_x_field(Field3D &F, const GridDesc &G, const SolverParams &P);
+
 // 2D Riemann 问题初始条件
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 

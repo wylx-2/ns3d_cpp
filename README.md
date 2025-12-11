@@ -122,4 +122,28 @@ $$
     \left[ (\nabla \mathbf{U}) + (\nabla \mathbf{U})^{\mathrm{T}} - \frac{2}{3} (\nabla \cdot \mathbf{U}) \mathbf{I} \right]
   $$
 
+  实际计算中采用通过无量纲量反算物理参数的方法，即
+  $$
+  \mu = \frac{1}{\mathrm{Re}}
+  $$
+  Sutherland公式可以写为
+  $$
+  \mu(T)=\frac{1}{Re}\frac{1+S/T_{ref}}{T+S/T_{ref}}\left(T\right)^{3/2}
+  $$
+
+  热力学量为
+  $$
+  C_v = \frac{1}{\gamma(\gamma-1)\mathrm{Ma}^2 } \\
+  C_p = \frac{1}{(\gamma-1)\mathrm{Ma}^2 } \\ 
+  \tilde R = \frac{1}{\gamma\mathrm{Ma}^2} \\
+  k = \frac{C_p \mu}{\mathrm{Pr}}
+  $$
+
+  **注意** 这里反算物理量并不是计算实际物理量或者参考值，而是一种满足相似关系的等效量。例如
+  $$
+      \text{Re}=\frac{\rho_\text{ref}U_\text{ref}L_\text{ref}}{\mu_\text{ref}} = \frac{\rho UL}{\mu}=\frac{1[\mathrm{kg/m^3}]\cdot1[\mathrm{m/s}]\cdot 1[\mathrm{m}]}{\mu_{temp}}
+  $$
+  其中的$\mu_{temp}$就不是实际物理量或者参考量，而是基于相似关系的等效量。而参考量只有当需要返回真实尺度时才起作用，因此Sutherland公式中需要对常数温度$S$指定$T_{ref}$
+
+
   ## 数值方法

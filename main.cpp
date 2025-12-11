@@ -26,6 +26,9 @@ int main(int argc, char** argv) {
                   << G.y0 << ", " << G.y0 + G.Ly << "] x ["
                   << G.z0 << ", " << G.z0 + G.Lz << "]\n";
         std::cout << "MPI size: " << C.size << " dims: [" << C.dims[0] << ", " << C.dims[1] << ", " << C.dims[2] << "]\n";
+        std::cout << "Solver Parameters:\n";
+        std::cout << "  gamma: " << P.gamma << ", Pr: " << P.Pr << ", Ma: " << P.Ma << ", Re: " << P.Re << "\n";
+        std::cout << "  Cv: " << P.Cv << ", Cp: " << P.Cp << ", Rgas: " << P.Rgas << "mu at T=1: " << P.get_mu(1.0) << "\n";
         std::cout << "  FVS type: ";
         switch (P.fvs_type) {
             case SolverParams::FVS_Type::StegerWarming: std::cout << "Steger-Warming\n"; break;
@@ -57,6 +60,7 @@ int main(int argc, char** argv) {
     // isotropic turbulence initialization
     // bar_urms_target = 1.0, k0 = 5.0, seed = 12345, rho0 = 1.0, p0 = 1.0
     init_isotropic_turbulence(F, G, C);
+    // initialize_sine_x_field(F, G, P);
 
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange
     F.primitiveToConserved(P); // update primitive variables (including ghosts)
@@ -65,7 +69,7 @@ int main(int argc, char** argv) {
 
     // output the initial field
     write_tecplot_field(F, G, C, P, 0.0);
-    if(P.isotropic_analyse) compute_energy_spectrum(F, G, C, "initial_spectrum.dat");
+    if(P.isotropic_analyse) isotropic_post_process(F, G, C, P, 0.0);
 
     // Main time-stepping loop
     time_advance(F, C, G, P);

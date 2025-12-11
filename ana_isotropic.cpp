@@ -9,6 +9,8 @@ struct TurbStats {
     double kinetic_energy = 0.0;   // volume averaged 0.5(u^2+v^2+w^2)
     double dissipation = 0.0;      // ε
     double u_rms = 0.0;            // rms velocity
+    double mean_mu = 0.0;        // mean dynamic viscosity
+    double mean_rho = 0.0;       // mean density
     double taylor = 0.0;           // Taylor microscale λ
     double taylor_Li = 0.0;        // Taylor-scale by Li Xinliang
     double Re_lambda = 0.0;        // Reynolds number based on Taylor scale
@@ -196,7 +198,6 @@ void compute_turbulence_statistics(Field3D &F,
                                    const CartDecomp &C,
                                    const double current_time)
 {
-    double nu = P.mu/1.0; // assume rho=1.0
     TurbStats stats;
 
     // -------- 1. Compute spectrum (already done before) --------
@@ -224,6 +225,8 @@ void compute_turbulence_statistics(Field3D &F,
     double local_urms2=0, global_urms2=0;
     double local_sound_speed=0, global_sound_speed=0;
     double local_dudx2=0, global_dudx2=0;
+    double local_mu=0, global_mu=0;
+    double local_rho=0, global_rho=0;
 
     {
         const LocalDesc &L = F.L;
@@ -238,6 +241,8 @@ void compute_turbulence_statistics(Field3D &F,
             local_urms2 += (uu*uu + vv*vv + ww*ww);
             local_dudx2 += F.du_dx[id]*F.du_dx[id];
             local_sound_speed += std::sqrt(P.gamma * P.Rgas * F.T[id]);
+            local_mu += P.get_mu(F.T[id]);
+            local_rho += F.rho[id];
         }
     }
 
@@ -245,10 +250,17 @@ void compute_turbulence_statistics(Field3D &F,
     MPI_Reduce(&local_urms2,&global_urms2,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
     MPI_Reduce(&local_dudx2,&global_dudx2,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
     MPI_Reduce(&local_sound_speed,&global_sound_speed,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
+    MPI_Reduce(&local_mu,&global_mu,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
+    MPI_Reduce(&local_rho,&global_rho,1,MPI_DOUBLE,MPI_SUM,0,C.cart_comm);
 
+    double nu = 0.0;
     if (C.rank==0)
     {
         int N = G.global_nx * G.global_ny * G.global_nz;
+        stats.mean_mu = global_mu / double(N);
+        stats.mean_rho = global_rho / double(N);
+        nu = stats.mean_mu / stats.mean_rho;
+
         stats.kinetic_energy = global_energy / double(N);
         stats.u_rms = std::sqrt(global_urms2 / double(3*N));
         stats.taylor_Li = stats.u_rms / std::sqrt(global_dudx2 / double(N));

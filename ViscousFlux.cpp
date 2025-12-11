@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <algorithm>
 #include <iostream>
+
 // -----------------------------------------------------------------
 // ---------   计算粘性通量模块 -------------------------------------
 // -----------------------------------------------------------------   
@@ -150,11 +151,10 @@ void compute_gradients(Field3D &F, const GridDesc &G)
 void compute_viscous_flux(Field3D &F, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
-    const double mu = P.mu;
     const double gamma = P.gamma;
     const double Rgas = P.Rgas;
     const double Pr = P.Pr;
-    const double Cp = gamma * Rgas / (gamma - 1.0);
+    const double Cp = P.Cp;
     const int nx = L.nx, ny = L.ny, nz = L.nz;
     const int ngx = L.ngx, ngy = L.ngy, ngz = L.ngz;
 
@@ -163,6 +163,7 @@ void compute_viscous_flux(Field3D &F, const SolverParams &P)
     for (int i = ngx; i < ngx+nx; ++i)
     {
         int id = F.I(i, j, k);
+        double mu = P.get_mu(F.T[id]);
 
         // 速度散度
         double divU = F.du_dx[id] + F.dv_dy[id] + F.dw_dz[id];
@@ -228,9 +229,12 @@ void compute_vis_flux(Field3D &F, const GridDesc &G)
         int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z);
 
         // Compute viscous flux gradients
+        // rho 通量为0，不计算
+        /*
         F.rhs_rho[id] += diff_x(F.Fvflux_mass, i, j, k, dx, order_x, L);
         F.rhs_rho[id] += diff_y(F.Hvflux_mass, i, j, k, dy, order_y, L);
         F.rhs_rho[id] += diff_z(F.Gvflux_mass, i, j, k, dz, order_z, L);
+        */
 
         F.rhs_rhou[id] += diff_x(F.Fvflux_momx, i, j, k, dx, order_x, L);
         F.rhs_rhou[id] += diff_y(F.Hvflux_momx, i, j, k, dy, order_y, L);
@@ -271,4 +275,5 @@ void compute_gradients_dudx(Field3D &F, const GridDesc &G)
         // Compute gradients
         F.du_dx[id] = diff_x(F.u, i, j, k, dx, order_x, L);
     }
+    
 }

@@ -14,7 +14,7 @@ static const double PI = 3.14159265358979323846;
 // 0~1 随机数
 // ------------------------------------------------------------
 double rnd01() {
-    static thread_local std::mt19937_64 rng(1234567);
+    static thread_local std::mt19937_64 rng(123);
     static thread_local std::uniform_real_distribution<double> dist(0.0, 1.0);
     return dist(rng);
 }

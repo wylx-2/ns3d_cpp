@@ -13,6 +13,7 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
     int monitor_Stepfreq = P.monitor_Stepfreq;
     double output_Timefreq = P.output_Timefreq;
     double TotalTime = P.TotalTime;
+    double dt = P.dt_fixed;
     
     HaloRequests out_reqs;
 
@@ -22,7 +23,8 @@ void time_advance(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P)
         F.recordConservedTo0();
 
         // 计算时间步长
-        double dt = compute_timestep(F, G, P);
+        if (P.dt_fixed < 0.0) double dt = compute_timestep(F, G, P);
+   
         bool if_output = false;
         if (current_time + dt > TotalTime) {
             dt = TotalTime - current_time; // adjust last step to hit TotalTime

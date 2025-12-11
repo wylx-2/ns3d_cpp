@@ -118,7 +118,8 @@ void compute_energy_spectrum_rank0(
         int k3 = (k <= NZ/2 ? k : k-NZ);
 
         int kk = (int) std::sqrt(1.0*(k1*k1 + k2*k2 + k3*k3)) + 0.5;
-        int id = (i*NY + j)*NZ + k;
+        // int id = (i*NY + j)*NZ + k;
+        int id = (k*NY + j)*NX + i;
         Ek[kk] += Er[id];
         Nk[kk] += 1;
     }

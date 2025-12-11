@@ -25,6 +25,7 @@
 #include <cstring>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 
 // --------------------------- Grid and decomposition -------------------------
 
@@ -83,10 +84,29 @@ inline int idx_fz(int i, int j, int k_face, const LocalDesc &L) noexcept {
 
 struct SolverParams {
     double gamma = 1.4;      // ratio of specific heats
-    double mu = 0.0;      // dynamic viscosity
     double Pr = 0.71;        // Prandtl number
-    double Rgas = 287.058;   // specific gas constant (J/kg/K), optional
+    double Ma = 0.4;        // Mach number
+    double Re = 500.0;      // Reynolds number
     double cfl = 0.1;
+    double dt_fixed = -1.0;   // if >0, use fixed time step
+
+    double mu = 1.0 / Re;      // dynamic viscosity
+    double S_ref = 110.4/273.0;   // Sutherland's constant
+    double get_mu(double T) const
+    {   
+        // constant viscosity for now
+        // return mu; 
+
+        // Sutherland's law
+        return mu * pow(T, 1.5) * (1 + S_ref) / (T + S_ref);
+
+        // power law
+        // return pow(T, 0.76);
+    }
+    double Cv = 1.0/(gamma*(gamma-1.0)*Ma*Ma);
+    double Cp = Cv*gamma;
+    double Rgas = 1.0/(Ma*Ma*gamma);
+
     bool use_periodic = false; // convenience
     // Flux Vector Splitting (FVS) selection
     enum class FVS_Type {

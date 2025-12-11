@@ -65,12 +65,13 @@ bool read_solver_params_from_file(
 
         // ---- 物理参数 ----
         if (k=="gamma") P.gamma = std::stod(val);
-        else if (k=="mu") P.mu = std::stod(val);
         else if (k=="pr") P.Pr = std::stod(val);
-        else if (k=="rgas") P.Rgas = std::stod(val);
+        else if (k=="ma") P.Ma = std::stod(val);
+        else if (k=="re") P.Re = std::stod(val);
 
         // ---- 时间推进 ----
         else if (k=="cfl") P.cfl = std::stod(val);
+        else if (k=="dt_fixed") P.dt_fixed = std::stod(val);
 
         // ---- 重构设置 ----
         else if (k=="fvs_type") {
@@ -169,6 +170,11 @@ bool read_solver_params_from_file(
             P.stencil = 6;
             break;
     }
+    // 物理量
+    P.Cv = 1.0/(P.gamma*(P.gamma-1.0)*P.Ma*P.Ma);
+    P.Cp = P.Cv*P.gamma;
+    P.Rgas = 1.0/(P.Ma*P.Ma*P.gamma);
+    P.mu = 1.0 / P.Re;
 
     return true;
 }
@@ -268,6 +274,25 @@ void initialize_uniform_field(Field3D &F, const GridDesc &G, const SolverParams 
         double u = 1.0, v = 1.0, w = 1.0;
         F.rho[id] = rho;
         F.u[id] = u;
+        F.v[id] = v;
+        F.w[id] = w;
+        F.p[id] = p0;
+    }
+}
+
+void initialize_sine_x_field(Field3D &F, const GridDesc &G, const SolverParams &P)
+{
+    // 一维沿x方向的正弦波分布，验证du_dx是否正确
+    LocalDesc &L = F.L;
+    const double p0 = 1.0; // reference pressure
+    for (int k=L.ngz; k<L.ngz+L.nz; ++k)
+    for (int j=L.ngy; j<L.ngy+L.ny; ++j)
+    for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
+        int id = F.I(i,j,k);
+        double rho = 1.0;
+        double u = 1.0, v = 1.0, w = 1.0;
+        F.rho[id] = rho;
+        F.u[id] = std::sin(2.0 * M_PI * ( (L.ox + i - L.ngx + 0.5) * G.dx ) / G.Lx );
         F.v[id] = v;
         F.w[id] = w;
         F.p[id] = p0;
