@@ -27,9 +27,9 @@ mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 64
-global_ny   = 64
-global_nz   = 64
+global_nx   = 128
+global_ny   = 128
+global_nz   = 128
 
 # Boundary conditions
 # Periodic/Outflow/Wall/

@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
         std::cout << "Domain: [" << G.x0 << ", " << G.x0 + G.Lx << "] x ["
                   << G.y0 << ", " << G.y0 + G.Ly << "] x ["
                   << G.z0 << ", " << G.z0 + G.Lz << "]\n";
+        std::cout << "  dx, dy, dz: [" << G.dx << ", " << G.dy << ", " << G.dz << "]\n";
         std::cout << "MPI size: " << C.size << " dims: [" << C.dims[0] << ", " << C.dims[1] << ", " << C.dims[2] << "]\n";
         std::cout << "Solver Parameters:\n";
         std::cout << "  gamma: " << P.gamma << ", Pr: " << P.Pr << ", Ma: " << P.Ma << ", Re: " << P.Re << "\n";

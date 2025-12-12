@@ -266,6 +266,11 @@ void compute_turbulence_statistics(Field3D &F,
         stats.taylor_Li = stats.u_rms / std::sqrt(global_dudx2 / double(N));
         stats.Mach_t = std::sqrt(stats.kinetic_energy*2) / (global_sound_speed / double(N));
         stats.Re_lambda = stats.u_rms * stats.taylor_Li / nu;
+        std::cout << "[Post] mean_mu = " << stats.mean_mu << ", mean_rho = " << stats.mean_rho
+                  << ", u_rms = " << stats.u_rms
+                  << ", dudx = " << global_dudx2 / double(N)
+                  << ", Taylor_Li = " << stats.taylor_Li
+                  << ", Mach_t = " << stats.Mach_t << "\n";
     }
 
     // -------- 3. Dissipation ε = 2 ν ∑ k² E(k) --------

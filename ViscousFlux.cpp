@@ -25,7 +25,7 @@ inline double diff_4th_central(const std::vector<double> &f, int i, double dx) {
 }
 
 inline double diff_6th_central(const std::vector<double> &f, int i, double dx) {
-    return (-f[i+3] + 9.0*f[i+2] - 45.0*f[i+1] + 45.0*f[i-1] - 9.0*f[i-2] + f[i-3]) / (60.0*dx);
+    return (f[i+3] - 9.0*f[i+2] + 45.0*f[i+1] - 45.0*f[i-1] + 9.0*f[i-2] - f[i-3]) / (60.0*dx);
 }
 
 

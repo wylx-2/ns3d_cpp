@@ -98,17 +98,21 @@ void generate_full_turbulence(int NX, int NY, int NZ,
     fftw_destroy_plan(pu); fftw_destroy_plan(pv); fftw_destroy_plan(pw);
 
     double norm = 1.0 / (double)N;
-    double Er = 0.0;
+    double Er = 0.0, Ei = 0.0;
 
     u.resize(N); v.resize(N); w.resize(N);
 
     for (int id=0; id<N; id++) {
-        u[id] = U[id].real() * norm;
-        v[id] = V[id].real() * norm;
-        w[id] = W[id].real() * norm;
+        u[id] = U[id].real() ;
+        v[id] = V[id].real() ;
+        w[id] = W[id].real() ;
         Er += 0.5 * (u[id]*u[id] + v[id]*v[id] + w[id]*w[id]);
+        Ei += 0.5 * (U[id].imag()*U[id].imag() + V[id].imag()*V[id].imag() + W[id].imag()*W[id].imag());
     }
     Er /= N;
+    Ei /= N;
+
+    std::cout << "[Turbulence] Initial energy: Er = " << Er << ", Ei = " << Ei << "\n";
 
     double scale = std::sqrt(Ek0 / Er);
     for (int id=0; id<N; id++) {
@@ -118,6 +122,8 @@ void generate_full_turbulence(int NX, int NY, int NZ,
     }
 
     std::cout << "[Turbulence] Energy normalized: scale=" << scale << "\n";
+
+
 }
 
 // ------------------------------------------------------------
