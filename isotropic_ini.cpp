@@ -125,7 +125,8 @@ void generate_full_turbulence(int NX, int NY, int NZ,
 // ------------------------------------------------------------
 void init_isotropic_turbulence(Field3D &F,
                                const GridDesc &G,
-                               const CartDecomp &C)
+                               const CartDecomp &C,
+                               const SolverParams &P)
 {
     const LocalDesc &L = F.L;
 
@@ -175,7 +176,8 @@ void init_isotropic_turbulence(Field3D &F,
                      k + L.ngz);
 
         F.rho[id] = 1.0;
-        F.p[id]   = 1.0;
+        F.T[id]   = 1.0;
+        F.p[id]   = P.Rgas * F.rho[id] * F.T[id];
         F.u[id]   = Uall[gid];
         F.v[id]   = Vall[gid];
         F.w[id]   = Wall[gid];

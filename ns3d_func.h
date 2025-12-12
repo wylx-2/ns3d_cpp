@@ -32,7 +32,7 @@ void generate_full_turbulence(int NX, int NY, int NZ,
                               std::vector<double> &u,
                               std::vector<double> &v,
                               std::vector<double> &w);
-void init_isotropic_turbulence(Field3D &F, const GridDesc &G, const CartDecomp &C);
+void init_isotropic_turbulence(Field3D &F, const GridDesc &G, const CartDecomp &C, const SolverParams &P);
 
 // 边界条件处理函数
 void apply_boundary(Field3D &F, GridDesc &G, CartDecomp &C, const SolverParams &P);

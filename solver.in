@@ -7,7 +7,7 @@ Length_ref      = 1.0
 Density_ref     = 1.0
 Temperature_ref = 1.0
 Velocity_ref    = 1.0
-Re          = 1000
+Re          = 500
 Ma          = 0.4
 gamma       = 1.4
 Pr          = 0.71
@@ -27,9 +27,9 @@ mdcd_disp = 0.0463783
 mdcd_diss = 0.01
 
 # Grid
-global_nx   = 128
-global_ny   = 128
-global_nz   = 128
+global_nx   = 64
+global_ny   = 64
+global_nz   = 64
 
 # Boundary conditions
 # Periodic/Outflow/Wall/
