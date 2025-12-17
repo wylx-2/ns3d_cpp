@@ -48,6 +48,14 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
         return mdcd_reconstruction(a5, P);
     }
 
+    if(r==SolverParams::Reconstruction::MDCD_HYBRID) {
+        require_size(6, "MDCD_HYBRID");
+        std::array<double,6> a6;
+        for (int i = 0; i < 6; ++i) a6[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a6.begin(), a6.end());
+        return mdcd_hybrid_reconstruction(a6, P);
+    }
+
     // fallback for unknown enum values or other cases: do a small
     // centered/biased average if the stencil is at least length 2.
     if (n >= 2) {
@@ -102,12 +110,12 @@ double weno5_reconstruction(const std::array<double,6>& stencil) {
 double mdcd_reconstruction(const std::array<double,6>& stencil, SolverParams P) {
     double diss = P.mdcd_diss;
     double disp = P.mdcd_disp;
-    return (1/2 * disp + 1 / 2 * diss) * stencil[0] +
-           (-3/2 * disp - 5 / 2 * diss - 1 / 12) * stencil[1] +
-           (7/12 + disp + 5 * diss) * stencil[2] +
-           (7/12 + disp - 5 * diss ) * stencil[3] +
-           (-3/2 * disp + 5 / 2 * diss - 1 / 12) * stencil[4] +
-           (1/2 * disp - 1 / 2 * diss) * stencil[5];
+    return (1.0/2.0 * disp + 1.0/2.0 * diss) * stencil[0] +
+           (-3.0/2.0 * disp - 5.0/2.0 * diss - 1.0/12.0) * stencil[1] +
+           (7.0/12.0 + disp + 5.0 * diss) * stencil[2] +
+           (7.0/12.0 + disp - 5.0 * diss ) * stencil[3] +
+           (-3.0/2.0 * disp + 5.0/2.0 * diss - 1.0/12.0) * stencil[4] +
+           (1.0/2.0 * disp - 1.0/2.0 * diss) * stencil[5];
 }
 
 // C6th 六阶中心差分
@@ -122,3 +130,80 @@ double c4th_reconstruction(const std::array<double,4>& stencil) {
     // 四阶中心差分重构公式
     return (1.0/12.0) * (-stencil[0] + 7*stencil[1] + 7*stencil[2] - stencil[3]);
 } 
+
+// MDCD-WENO 混合重构（标量，6点模板）
+double mdcd_hybrid_reconstruction(const std::array<double,6>& stencil, SolverParams P) {
+    double diss = P.mdcd_diss;
+    double disp = P.mdcd_disp;
+    double eps_small = 1e-40;
+
+    double f0 = stencil[0];
+    double f1 = stencil[1];
+    double f2 = stencil[2];
+    double f3 = stencil[3];
+    double f4 = stencil[4];
+    double f5 = stencil[5];
+
+    /*---------------------------------------------
+     * 1. Discontinuity detector (sigma)
+    *--------------------------------------------*/
+    double eps = 0.9 * 0.4 / (1.0 - 0.9 * 0.4) * 1e-4;
+
+    double a1 = std::abs(f2 - f1) + std::abs(f2 - 2*f1 + f0);
+    double b1 = std::abs(f2 - f3) + std::abs(f2 - 2*f3 + f4);
+    double a2 = std::abs(f3 - f2) + std::abs(f3 - 2*f2 + f1);
+    double b2 = std::abs(f3 - f4) + std::abs(f3 - 2*f4 + f5);
+    double sai1 = (2*a1*b1 + eps) / (a1*a1 + b1*b1 + eps);
+    double sai2 = (2*a2*b2 + eps) / (a2*a2 + b2*b2 + eps);
+    double sai  = std::min(sai1, sai2);
+    bool sigma = (sai > 0.4);
+
+    /*---------------------------------------------
+     * 2. MDCD interpolation
+    *--------------------------------------------*/
+    if (sigma)
+        // 在判定为间断时应切换到更耗散的插值，而不是递归调用自身。
+        // 这里采用线性的 MDCD 插值作为耗散分支，避免无限递归导致栈溢出。
+        return mdcd_reconstruction(stencil, P);
+    else
+    {
+    /*---------------------------------------------
+     * 3. MDCD-WENO reconstruction
+     *--------------------------------------------*/
+        double q0 = (2 * f0 - 7 * f1 + 11 * f2) / 6.0;
+        double q1 = (-f1 + 5 * f2 + 2 * f3) / 6.0;
+        double q2 = (2 * f2 + 5 * f3 - f4) / 6.0;
+        double q3 = (11 * f3 - 7 * f4 + 2 * f5) / 6.0;
+
+        double d0 = 1.5 * (disp + diss);
+        double d1 = 0.5 - 1.5 * (disp - 3*diss);
+        double d2 = 0.5 - 1.5 * (disp + 3*diss);
+        double d3 = 1.5 * (disp - diss);
+
+        double beta0 =
+            13.0/12.0*std::pow(f0-2*f1+f2,2) +
+            0.25*std::pow(f0-4*f1+3*f2,2);
+        double beta1 =
+            13.0/12.0*std::pow(f1-2*f2+f3,2) +
+            0.25*std::pow(f1-f3,2);
+        double beta2 =
+            13.0/12.0*std::pow(f2-2*f3+f4,2) +
+            0.25*std::pow(3*f2-4*f3+f4,2);
+        double beta3 =
+            (271799*std::pow(f0,2)
+            + f0*(-2380800*f1+4086352*f2-3462252*f3+1458762*f4-245620*f5)
+            + f1*(5653317*f1-20427884*f2+17905032*f3-7727988*f4+1325006*f5)
+            + f2*(19510972*f2-35817664*f3+15929912*f4-2792660*f5)
+            + f3*(17195652*f3-15880404*f4+2863984*f5)
+            + f4*(3824847*f4-1429976*f5)
+            + 139633*std::pow(f5,2)) / 120960.0;
+        double tau6 = std::abs(beta3 - (beta0 + 4*beta1 + beta2)/6.0);
+
+        double a0 = d0 * std::pow(20 + tau6/(beta0+eps_small),2);
+        double a1 = d1 * std::pow(20 + tau6/(beta1+eps_small),2);
+        double a2 = d2 * std::pow(20 + tau6/(beta2+eps_small),2);
+        double a3 = d3 * std::pow(20 + tau6/(beta3+eps_small),2);
+
+        return (a0*q0 + a1*q1 + a2*q2 + a3*q3) / (a0 + a1 + a2 + a3);
+    }
+}

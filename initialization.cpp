@@ -83,6 +83,7 @@ bool read_solver_params_from_file(
             if (v=="mdcd") P.recon = SolverParams::Reconstruction::MDCD;
             else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
             else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
+            else if (v=="mdcd_hybrid") P.recon = SolverParams::Reconstruction::MDCD_HYBRID;
         }
         else if (k=="vis_scheme") {
             if (v=="c4") P.vis_scheme = SolverParams::ViscousScheme::C4th;
@@ -166,6 +167,10 @@ bool read_solver_params_from_file(
             P.stencil = 2;
             break;
         case SolverParams::Reconstruction::MDCD:
+            P.ghost_layers = 3;
+            P.stencil = 6;
+            break;
+        case SolverParams::Reconstruction::MDCD_HYBRID:
             P.ghost_layers = 3;
             P.stencil = 6;
             break;

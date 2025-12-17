@@ -59,6 +59,9 @@ double mdcd_reconstruction(const std::array<double,6>& stencil, SolverParams P);
 // WENO5 重构（标量，6 点模板）
 double weno5_reconstruction(const std::array<double,6> &stencil);
 
+// MDCD-WENO 混合重构（标量，6点模板）
+double mdcd_hybrid_reconstruction(const std::array<double,6>& stencil, SolverParams P);
+
 // C6th 六阶中心差分重构（标量，6 点模板）
 double c6th_reconstruction(const std::array<double,6> &stencil);
 
