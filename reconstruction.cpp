@@ -56,6 +56,14 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
         return mdcd_hybrid_reconstruction(a6, P);
     }
 
+    if(r==SolverParams::Reconstruction::UPWIND_7TH) {
+        require_size(8, "UPWIND_7TH");
+        std::array<double,8> a8;
+        for (int i = 0; i < 8; ++i) a8[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a8.begin(), a8.end());
+        return UpWind_7th_reconstruction(a8);
+    }
+
     // fallback for unknown enum values or other cases: do a small
     // centered/biased average if the stencil is at least length 2.
     if (n >= 2) {
@@ -206,4 +214,11 @@ double mdcd_hybrid_reconstruction(const std::array<double,6>& stencil, SolverPar
 
         return (a0*q0 + a1*q1 + a2*q2 + a3*q3) / (a0 + a1 + a2 + a3);
     }
+}
+
+double UpWind_7th_reconstruction(const std::array<double,8>& stencil) {
+    // 七阶迎风差分重构公式.(Li Xinliang,2002)
+    return (-1.0/140.0)*stencil[0] + (5.0/84.0)*stencil[1] - (101.0/420.0)*stencil[2]
+           + (319.0/420.0)*stencil[3] + (107.0/210.0)*stencil[4]
+           - (19.0/210.0)*stencil[5] + (1.0/105.0)*stencil[6];
 }

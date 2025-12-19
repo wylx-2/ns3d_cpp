@@ -18,8 +18,8 @@ dt_fixed    = -0.0005
 
 # Reconstruction and schemes
 fvs_type    = LaxFriedrichs     
-recon       = MDCD
-vis_scheme  = C6th
+recon       = UPWIND_7th
+vis_scheme  = C8th
 char_recon  = yes
 
 # MDCD Parameter

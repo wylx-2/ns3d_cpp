@@ -46,11 +46,13 @@ int main(int argc, char** argv) {
             case SolverParams::Reconstruction::LINEAR: std::cout << "LINEAR\n"; break;
             case SolverParams::Reconstruction::MDCD: std::cout << "MDCD\n"; break;
             case SolverParams::Reconstruction::MDCD_HYBRID: std::cout << "MDCD_HYBRID\n"; break;
+            case SolverParams::Reconstruction::UPWIND_7TH: std::cout << "UPWIND_7TH\n"; break;
         }
         std::cout << "  Viscous scheme: ";
         switch (P.vis_scheme) {
             case SolverParams::ViscousScheme::C6th: std::cout << "6th-order central\n"; break;
             case SolverParams::ViscousScheme::C4th: std::cout << "4th-order central\n"; break;
+            case SolverParams::ViscousScheme::C8th: std::cout << "8th-order central\n"; break;
         }
     }
 

@@ -28,9 +28,36 @@ inline double diff_6th_central(const std::vector<double> &f, int i, double dx) {
     return (f[i+3] - 9.0*f[i+2] + 45.0*f[i+1] - 45.0*f[i-1] + 9.0*f[i-2] - f[i-3]) / (60.0*dx);
 }
 
+inline double diff_8th_central(const std::vector<double> &f, int i, double dx) {
+    double c1 = 0.8;
+    double c2 = -0.2;
+    double c3 = 0.0380952380952381; // 1/26.25
+    double c4 = -0.00357142857142857; // -1/280
+    return (c1 * (f[i+1] - f[i-1]) +
+            c2 * (f[i+2] - f[i-2]) +
+            c3 * (f[i+3] - f[i-3]) +
+            c4 * (f[i+4] - f[i-4])) / dx;
+}
 
 // C4th/C6th 改这个函数
-inline int choose_scheme(int idx, int nstart, int nend, bool periodic)
+inline int choose_scheme_C4(int idx, int nstart, int nend, bool periodic)
+{
+    if (periodic)
+        return 4; // always use 4th order for periodic
+    int dist_left = idx - nstart;
+    if (dist_left == 0)
+        return 1; // forward 2nd order for left boundary (flag == +1)
+    int dist_right = (nend - 1) - idx;
+    if (dist_right == 0)
+        return -1; // backward 2nd order for right boundary (flag == -1)
+    int dmin = std::min(dist_left, dist_right);
+    if (dmin == 1)
+        return 2; // 2nd order central for sub-boundary points
+    else
+        return 4; // 4th order central for inner points
+}
+
+inline int choose_scheme_C6(int idx, int nstart, int nend, bool periodic)
 {
     if (periodic)
         return 6; // always use 6th order for periodic
@@ -49,64 +76,168 @@ inline int choose_scheme(int idx, int nstart, int nend, bool periodic)
         return 6; // 6th order central for inner points
 }
 
+inline int choose_scheme_C8(int idx, int nstart, int nend, bool periodic)
+{
+    if (periodic)
+        return 8; // always use 8th order for periodic
+    int dist_left = idx - nstart;
+    if (dist_left == 0)
+        return 1; // forward 2nd order for left boundary (flag == +1)
+    int dist_right = (nend - 1) - idx;
+    if (dist_right == 0)
+        return -1; // backward 2nd order for right boundary (flag == -1)
+    int dmin = std::min(dist_left, dist_right);
+    if (dmin == 1)
+        return 2; // 2nd order central for sub-boundary points
+    else if (dmin == 2)
+        return 4; // 4th order central for sub-sub-boundary points
+    else if (dmin == 3)
+        return 6; // 6th order central for sub-sub-sub-boundary points
+    else
+        return 8; // 8th order central for inner points
+}
+
+inline int choose_scheme(int idx, int nstart, int nend, bool periodic, const SolverParams P)
+{
+    switch (P.vis_scheme)
+    {
+    case SolverParams::ViscousScheme::C8th:
+        return choose_scheme_C8(idx, nstart, nend, periodic);
+        break;
+    case SolverParams::ViscousScheme::C6th:
+        return choose_scheme_C6(idx, nstart, nend, periodic);
+        break;
+    case SolverParams::ViscousScheme::C4th:
+        return choose_scheme_C4(idx, nstart, nend, periodic);
+        break;
+    default:
+        std::cerr << "Error: Unknown ViscousScheme enum value.\n";
+        return 0;
+        break;
+    }
+}
+
 inline double diff_x(const std::vector<double> &f, int i, int j, int k, double dx, int order_x, const LocalDesc &L)
 {
-    std::vector<double> dummy(7);
-    for (int ii = 0; ii < 7; ++ii) 
-    {
-        dummy[ii] = f[idx3(i + ii - 3, j, k, L)];
-    }
-
     if (order_x == 1 || order_x == -1)
-        return diff_2nd_forward(dummy, 3, dx, order_x);
+    {
+        std::vector<double> dummy(5);
+        for (int ii = 0; ii < 5; ++ii) 
+            dummy[ii] = f[idx3(i + ii - 2, j, k, L)];
+        return diff_2nd_forward(dummy, 2, dx, order_x);
+    }
     else if (order_x == 2)
-        return diff_2nd_central(dummy, 3, dx);
+    {
+        std::vector<double> dummy(3);
+        for (int ii = 0; ii < 3; ++ii)
+            dummy[ii] = f[idx3(i + ii - 1, j, k, L)];
+        return diff_2nd_central(dummy, 1, dx);
+    }
     else if (order_x == 4)
-        return diff_4th_central(dummy, 3, dx);
-    else
+    {
+        std::vector<double> dummy(5);
+        for (int ii = 0; ii < 5; ++ii)
+            dummy[ii] = f[idx3(i + ii - 2, j, k, L)];
+        return diff_4th_central(dummy, 2, dx);
+    }
+    else if (order_x == 6)
+    {
+        std::vector<double> dummy(7);
+        for (int ii = 0; ii < 7; ++ii)
+            dummy[ii] = f[idx3(i + ii - 3, j, k, L)];
         return diff_6th_central(dummy, 3, dx);
+    }
+    else
+    {
+        std::vector<double> dummy(9);
+        for (int ii = 0; ii < 9; ++ii)
+            dummy[ii] = f[idx3(i + ii - 4, j, k, L)];
+        return diff_8th_central(dummy, 4, dx);
+    }
 }
 
 inline double diff_y(const std::vector<double> &f, int i, int j, int k, double dy, int order_y, const LocalDesc &L)
 {
-    std::vector<double> dummy(7);
-    for (int jj = 0; jj < 7; ++jj)
-    {
-        dummy[jj] = f[idx3(i, j + jj - 3, k, L)];
-    }
-
     if (order_y == 1 || order_y == -1)
-        return diff_2nd_forward(dummy, 3, dy, order_y);
+    {
+        std::vector<double> dummy(5);
+        for (int jj = 0; jj < 5; ++jj)
+            dummy[jj] = f[idx3(i, j + jj - 2, k, L)];
+        return diff_2nd_forward(dummy, 2, dy, order_y);
+    }
     else if (order_y == 2)
-        return diff_2nd_central(dummy, 3, dy);
+    {
+        std::vector<double> dummy(3);
+        for (int jj = 0; jj < 3; ++jj)
+            dummy[jj] = f[idx3(i, j + jj - 1, k, L)];
+        return diff_2nd_central(dummy, 1, dy);
+    }
     else if (order_y == 4)
-        return diff_4th_central(dummy, 3, dy);
-    else
+    {
+        std::vector<double> dummy(5);
+        for (int jj = 0; jj < 5; ++jj)
+            dummy[jj] = f[idx3(i, j + jj - 2, k, L)];
+        return diff_4th_central(dummy, 2, dy);
+    }
+    else if (order_y == 6)
+    {
+        std::vector<double> dummy(7);
+        for (int jj = 0; jj < 7; ++jj)
+            dummy[jj] = f[idx3(i, j + jj - 3, k, L)];
         return diff_6th_central(dummy, 3, dy);
+    }
+    else
+    {
+        std::vector<double> dummy(9);
+        for (int jj = 0; jj < 9; ++jj)
+            dummy[jj] = f[idx3(i, j + jj - 4, k, L)];
+        return diff_8th_central(dummy, 4, dy);
+    }
 }
 
 inline double diff_z(const std::vector<double> &f, int i, int j, int k, double dz, int order_z, const LocalDesc &L)
 {
-    std::vector<double> dummy(7);
-    for (int kk = 0; kk < 7; ++kk)
-    {
-        dummy[kk] = f[idx3(i, j, k + kk - 3, L)];
-    }
-
     if (order_z == 1 || order_z == -1)
-        return diff_2nd_forward(dummy, 3, dz, order_z);
+    {
+        std::vector<double> dummy(5);
+        for (int kk = 0; kk < 5; ++kk)
+            dummy[kk] = f[idx3(i, j, k + kk - 2, L)];
+        return diff_2nd_forward(dummy, 2, dz, order_z);
+    }
     else if (order_z == 2)
-        return diff_2nd_central(dummy, 3, dz);
+    {
+        std::vector<double> dummy(3);
+        for (int kk = 0; kk < 3; ++kk)
+            dummy[kk] = f[idx3(i, j, k + kk - 1, L)];
+        return diff_2nd_central(dummy, 1, dz);
+    }
     else if (order_z == 4)
-        return diff_4th_central(dummy, 3, dz);
-    else
+    {
+        std::vector<double> dummy(5);
+        for (int kk = 0; kk < 5; ++kk)
+            dummy[kk] = f[idx3(i, j, k + kk - 2, L)];
+        return diff_4th_central(dummy, 2, dz);
+    }
+    else if (order_z == 6)
+    {
+        std::vector<double> dummy(7);
+        for (int kk = 0; kk < 7; ++kk)
+            dummy[kk] = f[idx3(i, j, k + kk - 3, L)];
         return diff_6th_central(dummy, 3, dz);
+    }
+    else
+    {
+        std::vector<double> dummy(9);
+        for (int kk = 0; kk < 9; ++kk)
+            dummy[kk] = f[idx3(i, j, k + kk - 4, L)];
+        return diff_8th_central(dummy, 4, dz);
+    }
 }
 // ==================================================
 // 主函数：自适应阶数梯度计算, 根据边界距离选择差分格式
 // 计算内点的6阶中心差分，边界处根据距离选择低阶格式
 // ==================================================
-void compute_gradients(Field3D &F, const GridDesc &G)
+void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const double dx = G.dx, dy = G.dy, dz = G.dz;
@@ -124,9 +255,9 @@ void compute_gradients(Field3D &F, const GridDesc &G)
     {
         int id = F.I(i,j,k);
 
-        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x);
-        int order_y = choose_scheme(j, ngy, ngy+ny, periodic_y);
-        int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z);
+        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x, P);
+        int order_y = choose_scheme(j, ngy, ngy+ny, periodic_y, P);
+        int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z, P);
 
         // Compute gradients
         F.du_dx[id] = diff_x(F.u, i, j, k, dx, order_x, L);
@@ -207,7 +338,7 @@ void compute_viscous_flux(Field3D &F, const SolverParams &P)
     }
 }
 
-void compute_vis_flux(Field3D &F, const GridDesc &G)
+void compute_vis_flux(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const double dx = G.dx, dy = G.dy, dz = G.dz;
@@ -224,9 +355,9 @@ void compute_vis_flux(Field3D &F, const GridDesc &G)
     {
         int id = F.I(i,j,k);
 
-        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x);
-        int order_y = choose_scheme(j, ngy, ngy+ny, periodic_y);
-        int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z);
+        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x, P);
+        int order_y = choose_scheme(j, ngy, ngy+ny, periodic_y, P);
+        int order_z = choose_scheme(k, ngz, ngz+nz, periodic_z, P);
 
         // Compute viscous flux gradients
         // rho 通量为0，不计算
@@ -255,7 +386,7 @@ void compute_vis_flux(Field3D &F, const GridDesc &G)
 }
 
 // function to compute only du/dx for isotropic turbulence analysis
-void compute_gradients_dudx(Field3D &F, const GridDesc &G)
+void compute_gradients_dudx(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     const LocalDesc &L = F.L;
     const double dx = G.dx, dy = G.dy, dz = G.dz;
@@ -270,7 +401,7 @@ void compute_gradients_dudx(Field3D &F, const GridDesc &G)
     for (int i = ngx; i < ngx+nx; ++i)
     {
         int id = F.I(i,j,k);
-        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x);
+        int order_x = choose_scheme(i, ngx, ngx+nx, periodic_x, P);
         
         // Compute gradients
         F.du_dx[id] = diff_x(F.u, i, j, k, dx, order_x, L);

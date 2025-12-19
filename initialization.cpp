@@ -84,10 +84,12 @@ bool read_solver_params_from_file(
             else if (v=="weno5") P.recon = SolverParams::Reconstruction::WENO5;
             else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
             else if (v=="mdcd_hybrid") P.recon = SolverParams::Reconstruction::MDCD_HYBRID;
+            else if (v=="upwind_7th") P.recon = SolverParams::Reconstruction::UPWIND_7TH;
         }
         else if (k=="vis_scheme") {
             if (v=="c4") P.vis_scheme = SolverParams::ViscousScheme::C4th;
             else if (v=="c6") P.vis_scheme = SolverParams::ViscousScheme::C6th;
+            else if (v=="c8") P.vis_scheme = SolverParams::ViscousScheme::C8th;
         }
         else if (k=="char_recon") {
             P.char_recon = (v=="yes" || v=="true");
@@ -174,6 +176,28 @@ bool read_solver_params_from_file(
             P.ghost_layers = 3;
             P.stencil = 6;
             break;
+        case SolverParams::Reconstruction::UPWIND_7TH:
+            P.ghost_layers = 4;
+            P.stencil = 8;
+            break;
+        default:
+            std::cerr << "Error: unknown reconstruction scheme!\n";
+            break;     
+    }
+    switch (P.vis_scheme)
+    {
+    case SolverParams::ViscousScheme::C4th:
+        P.ghost_layers = std::max(P.ghost_layers, 2);
+        break;
+    case SolverParams::ViscousScheme::C6th:
+        P.ghost_layers = std::max(P.ghost_layers, 3);
+        break;
+    case SolverParams::ViscousScheme::C8th:
+        P.ghost_layers = std::max(P.ghost_layers, 4);
+        break;
+    default:
+        std::cerr << "Error: unknown viscous scheme!\n";
+        break;
     }
     // 物理量
     P.Cv = 1.0/(P.gamma*(P.gamma-1.0)*P.Ma*P.Ma);

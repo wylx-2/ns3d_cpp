@@ -230,7 +230,7 @@ void compute_turbulence_statistics(Field3D &F,
 
     {
         const LocalDesc &L = F.L;
-        compute_gradients_dudx(F, G);
+        compute_gradients_dudx(F, G, P); // 计算du/dx用于统计
         for (int k=0;k<L.nz;k++)
         for (int j=0;j<L.ny;j++)
         for (int i=0;i<L.nx;i++)

@@ -62,6 +62,9 @@ double weno5_reconstruction(const std::array<double,6> &stencil);
 // MDCD-WENO 混合重构（标量，6点模板）
 double mdcd_hybrid_reconstruction(const std::array<double,6>& stencil, SolverParams P);
 
+// 七阶迎风差分重构（标量，8 点模板）
+double UpWind_7th_reconstruction(const std::array<double,8>& stencil);
+
 // C6th 六阶中心差分重构（标量，6 点模板）
 double c6th_reconstruction(const std::array<double,6> &stencil);
 
@@ -110,13 +113,13 @@ static void build_eigen_matrices(const double Ul[5], const double Ur[5],
                                  double lambar[5]);
 
 // 计算空间导数
-void compute_gradients(Field3D &F, const GridDesc &G);
+void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 计算粘性通量
 void compute_viscous_flux(Field3D &F, const SolverParams &P);
 
 // 计算粘性通量导数
-void compute_vis_flux(Field3D &F, const GridDesc &G);
+void compute_vis_flux(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // Output full field in Tecplot ASCII format (per-rank file). Prefix will be used for filename: <prefix>_rank<id>.dat
 // time: physical time to label the output (optional, default 0.0)
@@ -149,4 +152,4 @@ void compute_energy_spectrum_rank0(
         const std::vector<double> &wall,
         const std::string &filename);
 // compute dudx gradients用于湍流统计
-void compute_gradients_dudx(Field3D &F, const GridDesc &G);
+void compute_gradients_dudx(Field3D &F, const GridDesc &G, const SolverParams &P);

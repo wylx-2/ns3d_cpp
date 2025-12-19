@@ -122,9 +122,11 @@ struct SolverParams {
         WCNS,      // Weighted Compact Nonlinear Scheme
         LINEAR,    // simple linear reconstruction
         MDCD,      // Minimum Dissipation controlled dispersion
-        MDCD_HYBRID  // MDCD-WENO hybrid reconstruction
+        MDCD_HYBRID,  // MDCD-WENO hybrid reconstruction
+        UPWIND_7TH // Seventh-order upwind difference
     };
     enum class ViscousScheme {
+        C8th,      // Eighth-order central difference
         C6th,      // Sixth-order central difference
         C4th       // Fourth-order central difference
     };
