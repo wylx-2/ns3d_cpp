@@ -409,20 +409,9 @@ void reconstructInviscidFlux(std::vector<double> &Fface,
                     gmax = std::max(gmax, std::abs(lamda[n][m]));
             for (int n = 0; n < VAR; ++n) lamdamax[n] = gmax;
         } break;
-        case SolverParams::FVS_Type::Rusanov: {
-            // Local Lax-Friedrichs: per-component max over stencil
-            for (int n = 0; n < VAR; ++n) {
-                double mxx = 0.0;
-                for (int m = 0; m < stencil; ++m) mxx = std::max(mxx, std::abs(lamda[n][m]));
-                lamdamax[n] = mxx;
-            }
-        } break;
-        case SolverParams::FVS_Type::VanLeer: {
-            // Van Leer: not finished yet
-        } break;
-        case SolverParams::FVS_Type::StegerWarming:
+        case SolverParams::FVS_Type::StagerWarming:
         {
-            // Steger-Warming: not finished yet
+            // Stager-Warming: not finished yet
         } break;
         default: {
             // default to get error

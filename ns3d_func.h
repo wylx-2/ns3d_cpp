@@ -25,7 +25,9 @@ void initialize_sine_x_field(Field3D &F, const GridDesc &G, const SolverParams &
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // sod shock tube 初始条件
-void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P);
+void initialize_sod_shock_tube_x(Field3D &F, const GridDesc &G, const SolverParams &P);
+void initialize_sod_shock_tube_y(Field3D &F, const GridDesc &G, const SolverParams &P);
+void initialize_sod_shock_tube_z(Field3D &F, const GridDesc &G, const SolverParams &P);
 
 // 三维各向同均匀湍流初始条件
 void generate_full_turbulence(int NX, int NY, int NZ,
@@ -112,6 +114,26 @@ static void build_eigen_matrices(const double Ul[5], const double Ur[5],
                                  double Lmat[5][5], double Rmat[5][5],
                                  double lambar[5]);
 
+void split_StagerWarming(const Field3D &F,
+                         std::vector<double> &F_plus,
+                         std::vector<double> &F_minus,
+                         int id,int n1, int n2, int n3,
+                         const SolverParams &P);
+void split_LaxFriedrichs(const Field3D &F,
+                         std::vector<double> &F_plus,
+                         std::vector<double> &F_minus,
+                         int id,int n1, int n2, int n3,
+                         const SolverParams &P);
+static void build_eigen_matrices_new(const double u[5],
+                                 double nx, double ny, double nz,
+                                 double gamma,
+                                 double Lmat[5][5], double Rmat[5][5],
+                                 double lambar[5]);
+void computeRoeAveragedState_new(double u_roe[5],
+                             const double ul[5], const double ur[5],
+                             double gamma);
+void du_inviscous(Field3D &F, const SolverParams &P);
+void du_inviscous_character(Field3D &F, const SolverParams &P);
 // 计算空间导数
 void compute_gradients(Field3D &F, const GridDesc &G, const SolverParams &P);
 

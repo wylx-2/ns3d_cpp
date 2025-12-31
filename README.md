@@ -91,7 +91,7 @@ $$
 - $\mu_0$ 是参考温度 $T_0$ 下的粘度（对于空气，$\mu_0=1.716\times 10^{-5}[\mathrm{kg/ms}]$，$T_0=273.15[\mathrm K]$，一般认为对$T<2000K$有效）
 - $S$ 是Sutherland常数（对于空气，$S = 110.4$ K）
 
-  ### 无量纲化
+### 无量纲化
 
   采用OpenCFD-SC类似方法无量纲化
 
@@ -151,4 +151,41 @@ $$
   $$
 
 
-  ## 数值方法
+## 数值方法
+
+### 无粘部分
+
+无粘部分采用矢量通量分裂方法（FVS）处理。首先通量的公式采用为
+
+$$
+\mathbf{F}= \frac{\rho}{2\gamma}\begin{bmatrix}
+\lambda_1+\lambda_3+2(\gamma-1)\lambda_2 \\
+(u-cn_1)\lambda_1+(u+cn_1)\lambda_3+2(\gamma-1)u\lambda_2\\
+(v-cn_2)\lambda_1+(v+cn_2)\lambda_3+2(\gamma-1)v\lambda_2\\
+(w-cn_3)\lambda_1+(w+cn_3)\lambda_3+2(\gamma-1)w\lambda_2\\
+(H-cu_n)\lambda_1+(H+cu_n)\lambda_3+2(\gamma-1)V\lambda_2
+\end{bmatrix}
+$$
+
+其中$\mathbf n$表示坐标轴方向，$\lambda$为特征值。不同FVS方法主要是对特征值的分裂不同
+
+- Stager-Warming分裂
+$$
+\lambda_k^+=\frac{\lambda_k+|\lambda_k|}{2},\lambda_k^-=\frac{\lambda_k-
+|\lambda_k|}{2}
+$$
+为了避免间断，可以修正为
+$$
+\lambda_k^\pm=\frac{\lambda_k\pm(\lambda_k^2+\epsilon^2)^{1/2}}{2}
+$$
+
+- Lax-Friedrichs分裂
+$$
+\lambda_k^\pm=\frac{\lambda_k\pm\lambda^\ast}{2},\quad \lambda^\ast=|\lambda_2|+c
+$$
+
+该方法相当于引入人工粘性，耗散较大
+
+- Van-Leer分裂
+
+略

@@ -110,12 +110,10 @@ struct SolverParams {
     bool use_periodic = false; // convenience
     // Flux Vector Splitting (FVS) selection
     enum class FVS_Type {
-        StegerWarming,
-        LaxFriedrichs,
-        Rusanov,         // Local Lax-Friedrichs
-        VanLeer
+        StagerWarming,
+        LaxFriedrichs
     };
-    FVS_Type fvs_type = FVS_Type::StegerWarming;
+    FVS_Type fvs_type = FVS_Type::StagerWarming;
     // Reconstruction selection for face reconstruction routines
     enum class Reconstruction {
         WENO5,     // stencil-based WENO5
@@ -192,7 +190,7 @@ struct Field3D {
     double global_Etot = 0.0;
 
     // Primitive variables (optional cache) -- keep for convenience / performance
-    std::vector<double> u, v, w, p, T;
+    std::vector<double> u, v, w, p, T, c;
 
     // Intermediate / RHS arrays
     std::vector<double> rhs_rho, rhs_rhou, rhs_rhov, rhs_rhow, rhs_E;
@@ -252,6 +250,7 @@ struct Field3D {
         w.assign(tot, 0.0);
         p.assign(tot, 0.0);
         T.assign(tot, 0.0);
+        c.assign(tot, 0.0);
 
         rhs_rho.assign(tot, 0.0);
         rhs_rhou.assign(tot, 0.0);
@@ -421,6 +420,7 @@ struct Field3D {
                     // pressure using ideal gas
                     p[id] = (gamma - 1.0) * rr * e_internal; // NOTE: here p = (gamma-1) * rho * e
                     T[id] = p[id] / (rr * par.Rgas);
+                    c[id] = std::sqrt(gamma * p[id] / rr);
                 }
     }
 
@@ -444,6 +444,7 @@ struct Field3D {
                     double e_internal = p[id] / ((gamma - 1.0) * rr);
                     E[id] = rr * (e_internal + kinetic);
                     T[id] = p[id] / (rr * par.Rgas);
+                    c[id] = std::sqrt(gamma * p[id] / rr);
                 }
     }   
 

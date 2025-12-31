@@ -23,7 +23,15 @@ void compute_rhs(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, HaloRe
     std::fill(F.rhs_E.begin(), F.rhs_E.end(), 0.0);
 
     // FVS计算无粘通量
-    computeFVSFluxes(F, P);
+    //computeFVSFluxes(F, P);
+    if(P.char_recon)
+    {
+        du_inviscous_character(F, P);
+    }
+    else
+    {
+        du_inviscous(F, P);
+    }
 
     // 计算空间导数
     compute_gradients(F, G, P);

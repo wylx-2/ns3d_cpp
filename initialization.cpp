@@ -75,8 +75,7 @@ bool read_solver_params_from_file(
 
         // ---- 重构设置 ----
         else if (k=="fvs_type") {
-            if (v=="stegerwarming") P.fvs_type = SolverParams::FVS_Type::StegerWarming;
-            else if (v=="vanleer") P.fvs_type = SolverParams::FVS_Type::VanLeer;
+            if (v=="stagerwarming") P.fvs_type = SolverParams::FVS_Type::StagerWarming;
             else if (v=="laxfriedrichs") P.fvs_type = SolverParams::FVS_Type::LaxFriedrichs;
         }
         else if (k=="recon") {
@@ -87,9 +86,9 @@ bool read_solver_params_from_file(
             else if (v=="upwind_7th") P.recon = SolverParams::Reconstruction::UPWIND_7TH;
         }
         else if (k=="vis_scheme") {
-            if (v=="c4") P.vis_scheme = SolverParams::ViscousScheme::C4th;
-            else if (v=="c6") P.vis_scheme = SolverParams::ViscousScheme::C6th;
-            else if (v=="c8") P.vis_scheme = SolverParams::ViscousScheme::C8th;
+            if (v=="c4th") P.vis_scheme = SolverParams::ViscousScheme::C4th;
+            else if (v=="c6th") P.vis_scheme = SolverParams::ViscousScheme::C6th;
+            else if (v=="c8th") P.vis_scheme = SolverParams::ViscousScheme::C8th;
         }
         else if (k=="char_recon") {
             P.char_recon = (v=="yes" || v=="true");
@@ -154,9 +153,9 @@ bool read_solver_params_from_file(
     if (P.bc_zmin==SolverParams::BCType::Periodic &&
         P.bc_zmax==SolverParams::BCType::Periodic)
         C.periods[2] = 1;
-    G.dx = G.Lx / (G.global_nx-1);
-    G.dy = G.Ly / (G.global_ny-1);
-    G.dz = G.Lz / (G.global_nz-1);
+    G.dx = G.Lx / (G.global_nx);
+    G.dy = G.Ly / (G.global_ny);
+    G.dz = G.Lz / (G.global_nz);
 
     // 根据重构格式设置ghost层数和stencil大小
     switch (P.recon) {
@@ -213,8 +212,8 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
     const LocalDesc &L = F.L;
     const double gamma = P.gamma;
 
-    const double x_mid = 0.5;
-    const double y_mid = 0.5;
+    const double x_mid = 0.8;
+    const double y_mid = 0.8;
 
     // ----- 遍历整个局部网格，包括所有 z 层 -----
     for (int k = 0; k < L.sz; ++k)
@@ -258,7 +257,7 @@ void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P)
     }
 }
 
-void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams &P)
+void initialize_sod_shock_tube_x(Field3D &F, const GridDesc &G, const SolverParams &P)
 {
     // Sod shock tube along x direction
     LocalDesc &L = F.L;
@@ -279,6 +278,71 @@ void initialize_sod_shock_tube(Field3D &F, const GridDesc &G, const SolverParams
         } else {
             rho = 0.125;
             u = 0.0;
+            p = 0.1;
+        }
+        F.rho[id] = rho;
+        F.u[id] = u;
+        F.v[id] = v;
+        F.w[id] = w;
+        F.p[id] = p;
+    }
+}
+
+void initialize_sod_shock_tube_y(Field3D &F, const GridDesc &G, const SolverParams &P)
+{
+    // Sod shock tube along y direction
+    LocalDesc &L = F.L;
+    const double gamma = P.gamma;
+    const double y_mid = 0.5 * G.global_ny * G.dy;
+
+    for (int k=L.ngz; k<L.ngz+L.nz; ++k)
+    for (int j=L.ngy; j<L.ngy+L.ny; ++j)
+    for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
+        int id = F.I(i,j,k);
+        double y = (L.oy + j - L.ngy + 0.5) * G.dy;
+        double rho, u, v, w, p;
+        u = 0.0; w = 0.0;
+        if (y < y_mid) {
+            rho = 1.0;
+            v = 0.0;
+            p = 1.0;
+        } 
+        else 
+        {
+            rho = 0.125;
+            v = 0.0;
+            p = 0.1;
+        }
+        F.rho[id] = rho;
+        F.u[id] = u;
+        F.v[id] = v;
+        F.w[id] = w;
+        F.p[id] = p;
+    }
+}
+void initialize_sod_shock_tube_z(Field3D &F, const GridDesc &G, const SolverParams &P)
+{
+    // Sod shock tube along z direction
+    LocalDesc &L = F.L;
+    const double gamma = P.gamma;
+    const double z_mid = 0.5 * G.global_nz * G.dz;
+
+    for (int k=L.ngz; k<L.ngz+L.nz; ++k)
+    for (int j=L.ngy; j<L.ngy+L.ny; ++j)
+    for (int i=L.ngx; i<L.ngx+L.nx; ++i) {
+        int id = F.I(i,j,k);
+        double z = (L.oz + k - L.ngz + 0.5) * G.dz;
+        double rho, u, v, w, p;
+        u = 0.0; v = 0.0;
+        if (z < z_mid) {
+            rho = 1.0;
+            w = 0.0;
+            p = 1.0;
+        } 
+        else 
+        {
+            rho = 0.125;
+            w = 0.0;
             p = 0.1;
         }
         F.rho[id] = rho;
