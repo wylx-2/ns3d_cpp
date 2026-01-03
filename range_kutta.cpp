@@ -145,4 +145,19 @@ void runge_kutta_3(Field3D &F, CartDecomp &C, GridDesc &G, SolverParams &P, Halo
     F.conservedToPrimitive(P);
     apply_boundary(F, G, C, P);
     F.primitiveToConserved(P);
+
+    // check for non-physical values (NaN or negative density/pressure)
+    for (int k = L.ngz; k < L.ngz + L.nz; ++k){
+    for (int j = L.ngy; j < L.ngy + L.ny; ++j){
+    for (int i = L.ngx; i < L.ngx + L.nx; ++i){
+        int id = F.I(i,j,k);
+        if (F.rho[id] <= 0.0 || F.p[id] <= 0.0 || F.T[id]<=0.0)
+        {
+            int mpi_rank = 0;
+            MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+            printf("Error: Non-physical value detected at rank %d, cell (%d,%d,%d): rho=%e, p=%e, T=%e\n",
+                   mpi_rank, i, j, k, F.rho[id], F.p[id], F.T[id]);
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }}}
 }

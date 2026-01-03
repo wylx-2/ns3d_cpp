@@ -196,6 +196,8 @@ void apply_inflow_bc(Field3D &F, const LocalDesc &L, int face)
         F.E[id]=E0;
     };
 
+    std::cout<<"Inflow BC need repair "<<face<<std::endl;
+
     if (face==XMIN) for(int k=0;k<sz;++k)for(int j=0;j<sy;++j)for(int i=0;i<ng;++i) fill(i,j,k);
     if (face==XMAX) for(int k=0;k<sz;++k)for(int j=0;j<sy;++j)for(int i=sx-ng;i<sx;++i) fill(i,j,k);
     if (face==YMIN) for(int k=0;k<sz;++k)for(int j=0;j<ng;++j)for(int i=0;i<sx;++i) fill(i,j,k);

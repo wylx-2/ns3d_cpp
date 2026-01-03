@@ -64,6 +64,14 @@ double reconstruct_select(const std::vector<double> &vstencil, double flag, cons
         return UpWind_7th_reconstruction(a8);
     }
 
+    if(r==SolverParams::Reconstruction::UD7L) {
+        require_size(8, "UD7L");
+        std::array<double,8> a8;
+        for (int i = 0; i < 8; ++i) a8[i] = vstencil[i];
+        if (flag < 0.0) std::reverse(a8.begin(), a8.end());
+        return ud7l_reconstruction(a8, P);
+    }
+
     // fallback for unknown enum values or other cases: do a small
     // centered/biased average if the stencil is at least length 2.
     if (n >= 2) {
@@ -221,4 +229,21 @@ double UpWind_7th_reconstruction(const std::array<double,8>& stencil) {
     return (-1.0/140.0)*stencil[0] + (5.0/84.0)*stencil[1] - (101.0/420.0)*stencil[2]
            + (319.0/420.0)*stencil[3] + (107.0/210.0)*stencil[4]
            - (19.0/210.0)*stencil[5] + (1.0/105.0)*stencil[6];
+}
+
+double ud7l_reconstruction(const std::array<double,8>& stencil, SolverParams P) {
+    double alpha = P.ud7l_alpha;
+
+    // 7th-order upwind reconstruction
+    double a0 = -3.0/420.0 * alpha -  3.0/840.0 * (1.0 - alpha);
+    double a1 = 25.0/420.0 * alpha + 29.0/840.0 * (1.0 - alpha);
+    double a2 = -101.0/420.0 * alpha - 139.0/840.0 * (1.0 - alpha);
+    double a3 = 319.0/420.0 * alpha + 533.0/840.0 * (1.0 - alpha);
+    double a4 = 214.0/420.0 * alpha + 533.0/840.0 * (1.0 - alpha);
+    double a5 = -38.0/420.0 * alpha - 139.0/840.0 * (1.0 - alpha);
+    double a6 =  4.0/420.0 * alpha + 29.0/840.0 * (1.0 - alpha);
+    double a7 = (-3.0/840.0) * (1.0 - alpha);
+    // Blended reconstruction
+    return a0*stencil[0] + a1*stencil[1] + a2*stencil[2] + a3*stencil[3]
+           + a4*stencil[4] + a5*stencil[5] + a6*stencil[6] + a7*stencil[7];
 }

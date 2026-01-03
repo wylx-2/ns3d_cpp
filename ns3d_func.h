@@ -67,6 +67,9 @@ double mdcd_hybrid_reconstruction(const std::array<double,6>& stencil, SolverPar
 // 七阶迎风差分重构（标量，8 点模板）
 double UpWind_7th_reconstruction(const std::array<double,8>& stencil);
 
+// 7th-order upwind difference with 8th central difference (UD7L) 重构（标量，8 点模板）
+double ud7l_reconstruction(const std::array<double,8>& stencil, SolverParams P);
+
 // C6th 六阶中心差分重构（标量，6 点模板）
 double c6th_reconstruction(const std::array<double,6> &stencil);
 

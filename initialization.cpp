@@ -84,6 +84,7 @@ bool read_solver_params_from_file(
             else if (v=="linear") P.recon = SolverParams::Reconstruction::LINEAR;
             else if (v=="mdcd_hybrid") P.recon = SolverParams::Reconstruction::MDCD_HYBRID;
             else if (v=="upwind_7th") P.recon = SolverParams::Reconstruction::UPWIND_7TH;
+            else if (v=="ud7l") P.recon = SolverParams::Reconstruction::UD7L;
         }
         else if (k=="vis_scheme") {
             if (v=="c4th") P.vis_scheme = SolverParams::ViscousScheme::C4th;
@@ -96,6 +97,7 @@ bool read_solver_params_from_file(
         
         else if (k=="mdcd_diss") P.mdcd_diss = std::stod(val);
         else if (k=="mdcd_disp") P.mdcd_disp = std::stod(val);
+        else if (k=="ud7l_alpha") P.ud7l_alpha = std::stod(val);
 
         // ---- 网格 ----
         else if (k=="global_nx") G.global_nx = std::stoi(val);
@@ -179,6 +181,10 @@ bool read_solver_params_from_file(
             P.ghost_layers = 4;
             P.stencil = 8;
             break;
+        case SolverParams::Reconstruction::UD7L:
+            P.ghost_layers = 4;
+            P.stencil = 8;
+            break; 
         default:
             std::cerr << "Error: unknown reconstruction scheme!\n";
             break;     

@@ -45,6 +45,7 @@ int main(int argc, char** argv) {
             case SolverParams::Reconstruction::MDCD: std::cout << "MDCD\n"; break;
             case SolverParams::Reconstruction::MDCD_HYBRID: std::cout << "MDCD_HYBRID\n"; break;
             case SolverParams::Reconstruction::UPWIND_7TH: std::cout << "UPWIND_7TH\n"; break;
+            case SolverParams::Reconstruction::UD7L: std::cout << "UD7L\n"; break;
         }
         std::cout << "  Viscous scheme: ";
         switch (P.vis_scheme) {
@@ -57,11 +58,11 @@ int main(int argc, char** argv) {
     Field3D F; 
     F.allocate(L);
     // initialize_uniform_field(F, G, P);  // Initialize field
-    initialize_riemann_2d(F, G, P);
+    // initialize_riemann_2d(F, G, P);
     // initialize_sod_shock_tube_z(F, G, P);
     // isotropic turbulence initialization
     // bar_urms_target = 1.0, k0 = 5.0, seed = 12345, rho0 = 1.0, p0 = 1.0
-    // init_isotropic_turbulence(F, G, C, P);
+    init_isotropic_turbulence(F, G, C, P);
     // initialize_sine_x_field(F, G, P);
 
     apply_boundary(F, G, C, P); // apply boundary conditions and holo exchange

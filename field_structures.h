@@ -91,14 +91,14 @@ struct SolverParams {
     double dt_fixed = -1.0;   // if >0, use fixed time step
 
     double mu = 1.0 / Re;      // dynamic viscosity
-    double S_ref = 110.4/273.0;   // Sutherland's constant
     double get_mu(double T) const
     {   
         // constant viscosity for now
         // return mu; 
 
         // Sutherland's law
-        return mu * pow(T, 1.5) * (1 + S_ref) / (T + S_ref);
+        double S_ref = 110.4/288.15;   // Sutherland's constant
+        return mu * pow(T, 1.5) * (1.0 + S_ref) / (T + S_ref);
 
         // power law
         // return pow(T, 0.76);
@@ -121,7 +121,8 @@ struct SolverParams {
         LINEAR,    // simple linear reconstruction
         MDCD,      // Minimum Dissipation controlled dispersion
         MDCD_HYBRID,  // MDCD-WENO hybrid reconstruction
-        UPWIND_7TH // Seventh-order upwind difference
+        UPWIND_7TH, // Seventh-order upwind difference
+        UD7L    // 7th-order upwind difference with 8th central difference
     };
     enum class ViscousScheme {
         C8th,      // Eighth-order central difference
@@ -132,6 +133,7 @@ struct SolverParams {
     ViscousScheme vis_scheme = ViscousScheme::C6th;
     double mdcd_diss = 0.01;  // MDCD dissipation coefficient
     double mdcd_disp = 0.0463783;  // MDCD dispersion coefficient
+    double ud7l_alpha = 0.4; // UD7L blending factor
 
     // runtime stencil size for reconstructions
     int stencil = 6;
