@@ -24,6 +24,22 @@ void initialize_sine_x_field(Field3D &F, const GridDesc &G, const SolverParams &
 // 2D Riemann 问题初始条件
 void initialize_riemann_2d(Field3D &F, const GridDesc &G, const SolverParams &P);
 
+// 从 write_tecplot_field 的 dat 文件恢复初场
+bool initialize_from_tecplot(Field3D &F,
+                             const GridDesc &G,
+                             const CartDecomp &C,
+                             const SolverParams &P,
+                             const std::string &filename);
+// 从 256^3 Tecplot 文件均匀抽样到当前网格并初始化
+bool initialize_from_tecplot_downsample(Field3D &F,
+                                        const GridDesc &G,
+                                        const CartDecomp &C,
+                                        const SolverParams &P,
+                                        const std::string &filename,
+                                        int src_nx = 256,
+                                        int src_ny = 256,
+                                        int src_nz = 256);
+
 // sod shock tube 初始条件
 void initialize_sod_shock_tube_x(Field3D &F, const GridDesc &G, const SolverParams &P);
 void initialize_sod_shock_tube_y(Field3D &F, const GridDesc &G, const SolverParams &P);
